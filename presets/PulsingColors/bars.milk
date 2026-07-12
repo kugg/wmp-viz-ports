@@ -1,5 +1,6 @@
 [preset00]
 // PulsingColors Bars - Spectrum Analyzer
+// 32 vertical bars from baseline, rainbow colored
 fRating=3.000000
 fGammaAdj=1.000000
 fVideoEchoZoom=1.000000
@@ -50,7 +51,7 @@ wave_scale=1.000000
 wave_smoothing=0.300000
 wave_mystery=0.000000
 wave_aspect=1.000000
-fDecay=0.990000
+fDecay=1.000000
 
 per_frame_1=wave_a = 0;
 per_frame_2=t = time;
@@ -58,7 +59,7 @@ per_frame_3=zoom = 1.0 - 0.01*bass;
 per_frame_4=dx = 0.0003*sin(t*0.4);
 per_frame_5=dy = 0.0003*cos(t*0.3);
 
-// 32 spectrum dots (bUseDots=true, no connecting lines)
+// 32 spectrum dots (one per bar, placed at spectrum height)
 wavecode_0_enabled=1
 wavecode_0_bSpectrum=1
 wavecode_0_samples=32
@@ -83,6 +84,28 @@ wave_0_per_point7=a = 1.0;
 
 comp_1=`shader_body
 comp_2=`{
-comp_3=`  float3 col = tex2D(sampler_main, uv).rgb;
-comp_4=`  ret = col;
-comp_5=`}
+comp_3=`  float num_bars = 32.0;
+comp_4=`  float bar_w = 1.0 / num_bars;
+comp_5=`  float bar_idx = floor(uv.x * num_bars);
+comp_6=`  float bar_cx = (bar_idx + 0.5) * bar_w;
+comp_7=`  float bar_frac = fract(uv.x * num_bars);
+comp_8=`
+comp_9=`  float max_bright = 0.0;
+comp_10=`  float bar_top = 0.1;
+comp_11=`  for (int i = 0; i < 40; i++) {
+comp_12=`    float fy = 0.05 + float(i) * 0.02375;
+comp_13=`    float bright = tex2D(sampler_main, float2(bar_cx, fy)).r;
+comp_14=`    if (bright > max_bright) {
+comp_15=`      max_bright = bright;
+comp_16=`      bar_top = fy;
+comp_17=`    }
+comp_18=`  }
+comp_19=`
+comp_20=`  float3 bar_col = tex2D(sampler_main, float2(bar_cx, bar_top)).rgb;
+comp_21=`  float in_bar = step(0.05, uv.y) * step(uv.y, max(bar_top, 0.051));
+comp_22=`  float edge = smoothstep(0.0, 0.08, bar_frac) * smoothstep(1.0, 0.92, bar_frac);
+comp_23=`  float3 col = bar_col * in_bar * edge;
+comp_24=`
+comp_25=`  col += col * 0.4;
+comp_26=`  ret = col;
+comp_27=`}
