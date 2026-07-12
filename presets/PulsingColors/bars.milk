@@ -1,6 +1,6 @@
 [preset00]
 // PulsingColors Bars
-// Cross-shaped box blur with audio-reactive radius and HSL color rotation
+// Spectrum analyzer with vertical bars and rainbow coloring
 fRating=3.000000
 fGammaAdj=1.000000
 fVideoEchoZoom=1.000000
@@ -51,71 +51,69 @@ wave_scale=1.000000
 wave_smoothing=0.500000
 wave_mystery=0.000000
 wave_aspect=1.000000
-fDecay=0.950000
+fDecay=0.930000
 
-per_frame_1=t = time*0.4;
-per_frame_2=blur_radius = 2.0 + 6.0*bass;
-per_frame_3=hue_shift = hue_shift + 0.02 + 0.01*treb;
-per_frame_4=target_r = 0.5 + 0.5*sin(hue_shift);
-per_frame_5=target_g = 0.5 + 0.5*sin(hue_shift + 2.094);
-per_frame_6=target_b = 0.5 + 0.5*sin(hue_shift + 4.189);
-per_frame_7=zoom = 1.0 - 0.02*bass;
-per_frame_8=dx = 0.001*sin(t*0.7);
-per_frame_9=dy = 0.001*cos(t*0.5);
+per_frame_1=wave_a = 0;
+per_frame_2=t = time;
+per_frame_3=zoom = 1.0 - 0.01*bass;
+per_frame_4=dx = 0.0003*sin(t*0.4);
+per_frame_5=dy = 0.0003*cos(t*0.3);
 
-per_pixel_1=ux = x - 0.5;
-per_pixel_2=uy = y - 0.5;
-per_pixel_3=dist = sqrt(ux*ux + uy*uy);
-per_pixel_4=ang = atan2(uy, ux);
-per_pixel_5=// Cross-shaped distance: bars extend along axes
-per_pixel_6=cross_dist = abs(ux) + abs(uy);
-per_pixel_7=// Bar pulse: thicker near center, modulated by blur_radius
-per_pixel_8=bar_width = 0.05 + 0.1*bass;
-per_pixel_9=min_ux_uy = min(abs(ux), abs(uy));
-per_pixel_10=t_bar = (min_ux_uy - bar_width) * 50.0;
-per_pixel_11=t_bar = min(max(t_bar, 0.0), 1.0);
-per_pixel_12=bar = 1.0 - t_bar*t_bar*(3.0 - 2.0*t_bar);
-per_pixel_13=falloff = 1.0 - dist*1.5;
-per_pixel_14=falloff = max(falloff, 0.0);
-per_pixel_15=bright = bar * falloff;
-per_pixel_16=warp_x = bright * sign(ux) * 0.01;
-per_pixel_17=warp_y = bright * sign(uy) * 0.01;
-per_pixel_18=dx = warp_x;
-per_pixel_19=dy = warp_y;
+wavecode_0_enabled=1
+wavecode_0_bSpectrum=1
+wavecode_0_samples=128
+wavecode_0_scaling=1.500000
+wavecode_0_smoothing=0.500000
+wavecode_0_sep=0
+wavecode_0_bUseDots=0
+wavecode_0_bDrawThick=1
+wavecode_0_bAdditive=1
+wavecode_0_r=1.0
+wavecode_0_g=1.0
+wavecode_0_b=1.0
+wavecode_0_a=0.8
+
+wave_0_per_point1=x = sample;
+wave_0_per_point2=y = 0.1 + value1 * 0.8;
+wave_0_per_point3=hue = sample * 6.2832 + time * 0.3;
+wave_0_per_point4=r = 0.5 + 0.5*sin(hue);
+wave_0_per_point5=g = 0.5 + 0.5*sin(hue + 2.094);
+wave_0_per_point6=b = 0.5 + 0.5*sin(hue + 4.189);
+wave_0_per_point7=a = 0.8;
 
 comp_1=`shader_body
 comp_2=`{
-comp_3=`  float2 uv2 = uv - 0.5;
-comp_4=`  float dist = length(uv2);
-comp_5=`  float angle = atan2(uv2.y, uv2.x);
-comp_6=`
-comp_7=`  // Cross-shaped bars: horizontal + vertical bars
-comp_8=`  float bar_h = 1.0 - smoothstep(0.02, 0.08, abs(uv2.y));
-comp_9=`  float bar_v = 1.0 - smoothstep(0.02, 0.08, abs(uv2.x));
-comp_10=`  float bars = max(bar_h, bar_v);
-comp_11=`
-comp_12=`  // Audio-reactive blur radius spreads the bars
-comp_13=`  float spread = 0.02 + 0.08*max(bass_att - 0.3, 0.0);
-comp_14=`  float blurred = 0.0;
-comp_15=`  for (int i = -3; i <= 3; i++) {
-comp_16=`    float fi = float(i) * spread;
-comp_17=`    blurred += tex2D(sampler_main, uv + float2(fi, 0)).a;
-comp_18=`    blurred += tex2D(sampler_main, uv + float2(0, fi)).a;
-comp_19=`  }
-comp_20=`  blurred /= 14.0;
-comp_21=`
-comp_22=`  // Combine bar structure with blurred color
-comp_23=`  float3 bar_col = tex2D(sampler_main, uv).rgb;
-comp_24=`  float3 blur_col = tex2D(sampler_main, uv + float2(blurred*0.01, blurred*0.01)).rgb;
-comp_25=`
-comp_26=`  // HSL color rotation
-comp_27=`  float hue = time*0.3 + dist*2.0;
-comp_28=`  float3 shift = float3(0.5+0.5*sin(hue), 0.5+0.5*sin(hue+2.094), 0.5+0.5*sin(hue+4.189));
-comp_29=`
-comp_30=`  // Mix bar color with blurred color, apply hue shift
-comp_31=`  float3 col = lerp(bar_col, blur_col, 0.3) * (0.5 + 0.5*bars);
-comp_32=`  col *= 0.6 + 0.4*shift;
-comp_33=`  col *= 1.0 - saturate(dist*1.5);
+comp_3=`  float num_bars = 32.0;
+comp_4=`  float bar_idx = floor(uv.x * num_bars);
+comp_5=`  float bar_center = (bar_idx + 0.5) / num_bars;
+comp_6=`  float bar_frac = fract(uv.x * num_bars);
+comp_7=`
+comp_8=`  // Scan vertically to find the spectrum line (brightest pixel)
+comp_9=`  float max_bright = 0.0;
+comp_10=`  float bar_height = 0.1;
+comp_11=`  for (int i = 0; i < 20; i++) {
+comp_12=`    float fy = 0.05 + float(i) * 0.045;
+comp_13=`    float bright = tex2D(sampler_main, float2(bar_center, fy)).r;
+comp_14=`    if (bright > max_bright) {
+comp_15=`      max_bright = bright;
+comp_16=`      bar_height = fy;
+comp_17=`    }
+comp_18=`  }
+comp_19=`
+comp_20=`  // Fill bar from bottom to detected height
+comp_21=`  float in_bar = step(uv.y, bar_height);
+comp_22=`
+comp_23=`  // Color from the spectrum line
+comp_24=`  float3 line_col = tex2D(sampler_main, float2(bar_center, bar_height)).rgb;
+comp_25=`  float3 col = line_col * in_bar;
+comp_26=`
+comp_27=`  // Sharpen bar edges
+comp_28=`  float edge = smoothstep(0.0, 0.08, bar_frac) * smoothstep(1.0, 0.92, bar_frac);
+comp_29=`  col *= edge;
+comp_30=`
+comp_31=`  // Glow
+comp_32=`  col += col * 0.5;
+comp_33=`  col += pow(max(col.r, max(col.g, col.b)), 2.0) * 0.3;
 comp_34=`
 comp_35=`  ret = col;
 comp_36=`}
