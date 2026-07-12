@@ -61,11 +61,11 @@ per_frame_5=dy = 0.0003*cos(t*0.3);
 
 wavecode_0_enabled=1
 wavecode_0_bSpectrum=1
-wavecode_0_samples=128
+wavecode_0_samples=64
 wavecode_0_scaling=4.000000
 wavecode_0_smoothing=0.400000
 wavecode_0_sep=0
-wavecode_0_bUseDots=1
+wavecode_0_bUseDots=0
 wavecode_0_bDrawThick=1
 wavecode_0_bAdditive=0
 wavecode_0_r=1.0
@@ -73,13 +73,16 @@ wavecode_0_g=1.0
 wavecode_0_b=1.0
 wavecode_0_a=1.0
 
-wave_0_per_point1=x = sample;
-wave_0_per_point2=y = 0.05 + value1 * 0.9;
-wave_0_per_point3=hue = sample * 6.2832 + time * 0.2;
-wave_0_per_point4=r = 0.5 + 0.5*sin(hue);
-wave_0_per_point5=g = 0.5 + 0.5*sin(hue + 2.094);
-wave_0_per_point6=b = 0.5 + 0.5*sin(hue + 4.189);
-wave_0_per_point7=a = 1.0;
+// 64 samples = 32 bars x 2 points each (bottom, top)
+wave_0_per_point1=bar = floor(sample * 32);
+wave_0_per_point2=is_top = floor(sample * 64) - bar * 2;
+wave_0_per_point3=x = (bar + 0.5) / 32;
+wave_0_per_point4=y = if(is_top, 0.05 + value1 * 0.9, 0.05);
+wave_0_per_point5=hue = bar / 32.0 * 6.2832 + time * 0.2;
+wave_0_per_point6=r = 0.5 + 0.5*sin(hue);
+wave_0_per_point7=g = 0.5 + 0.5*sin(hue + 2.094);
+wave_0_per_point8=b = 0.5 + 0.5*sin(hue + 4.189);
+wave_0_per_point9=a = if(is_top, 1.0, 0.0);
 
 comp_1=`shader_body
 comp_2=`{
