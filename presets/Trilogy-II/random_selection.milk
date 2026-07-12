@@ -1,0 +1,97 @@
+[preset00]
+// Trilogy II - Random Selection
+// Spiral path generation with neighborhood averaging and audio scatter
+fRating=3.000000
+fGammaAdj=1.000000
+fVideoEchoZoom=1.000000
+fVideoEchoAngle=0.000000
+fWaveMode=0
+bWaveThick=false
+bAdditiveWaves=false
+bWaveDarken=false
+bSmooth=true
+bModWaveAlphaByVolume=false
+bModWaveAlphaReverse=false
+bInterlace=false
+bBrighten=false
+bDarken=false
+bSolarize=false
+fWaveAlpha=0.700000
+fWaveScale=1.000000
+fWaveSmoothing=0.500000
+fWaveAspect=1.000000
+fWarpAnimSpeed=1.000000
+fWarpScale=1.500000
+fZoomExponent=1.000000
+fZoom=1.000000
+fSpin=0.000000
+fZoomCamera=0.000000
+dx=0.000000
+dy=0.000000
+cx=0.500000
+cy=0.500000
+sx=1.000000
+sy=1.000000
+ob_size=0.000000
+ob_r=0.000000
+ob_g=0.000000
+ob_b=0.000000
+ob_a=0.000000
+ib_size=0.000000
+ib_r=0.000000
+ib_g=0.000000
+ib_b=0.000000
+ib_a=0.000000
+wave_r=0.300000
+wave_g=0.700000
+wave_b=1.000000
+wave_a=0.000000
+wave_mode=0
+wave_scale=1.000000
+wave_smoothing=0.500000
+wave_mystery=0.000000
+wave_aspect=1.000000
+fDecay=0.960000
+
+per_frame_1=t = time*0.3;
+per_frame_2=spiral_pos = t*0.5;
+per_frame_3=scatter_x = 0.3*bass;
+per_frame_4=scatter_y = 0.3*mid;
+per_frame_5=brightness = 0.7 + 0.3*treb;
+per_frame_6=zoom = 1.0 - 0.02*bass;
+per_frame_7=spin = 0.002*sin(t);
+
+per_pixel_1=ux = x - 0.5;
+per_pixel_2=uy = y - 0.5;
+per_pixel_3=dist = sqrt(ux*ux + uy*uy);
+per_pixel_4=ang = atan2(uy, ux);
+per_pixel_5=spiral_idx = ang/6.2832 + 0.5 + dist*2.0 + spiral_pos;
+per_pixel_6=sx2 = (0.5 + uy)*ux*scatter_x;
+per_pixel_7=sy2 = (0.5 + ux)*uy*scatter_y;
+per_pixel_8=dx = ux*0.1 + sx2*0.05;
+per_pixel_9=dy = uy*0.1 + sy2*0.05;
+
+comp_1=`shader_body
+comp_2=`{
+comp_3=`  float2 uv2 = uv - 0.5;
+comp_4=`  float dist = length(uv2);
+comp_5=`  float angle = atan2(uv2.y, uv2.x);
+comp_6=`  float spiral = fmod(angle/6.2832 + 0.5 + dist*3.0 - time*0.3, 1.0);
+comp_7=`  spiral = smoothstep(0.45, 0.55, spiral);
+comp_8=`  float blur_r = 0.5 + 0.3*max(bass_att - 0.3, 0.0);
+comp_9=`  float3 blurred = tex2D(sampler_main, uv + float2(blur_r*0.005, 0)).rgb;
+comp_10=`  blurred += tex2D(sampler_main, uv - float2(blur_r*0.005, 0)).rgb;
+comp_11=`  blurred += tex2D(sampler_main, uv + float2(0, blur_r*0.005)).rgb;
+comp_12=`  blurred += tex2D(sampler_main, uv - float2(0, blur_r*0.005)).rgb;
+comp_13=`  blurred *= 0.25;
+comp_14=`  float scatter = 0.0;
+comp_15=`  float2 sc = float2((0.5+uv2.y)*uv2.x, (0.5+uv2.x)*uv2.y);
+comp_16=`  scatter = length(sc) * max(bass_att - 0.3, 0.0) * 3.0;
+comp_17=`  float3 col = blurred * (0.3 + 0.7*spiral);
+comp_18=`  col += float3(0.1, 0.3, 0.6) * scatter * spiral;
+comp_19=`  float hue_shift = fmod(time*0.2 + dist*2.0, 6.2832);
+comp_20=`  float3 hue = float3(0.5+0.5*sin(hue_shift), 0.5+0.5*sin(hue_shift+2.094), 0.5+0.5*sin(hue_shift+4.189));
+comp_21=`  col *= 0.6 + 0.4*hue;
+comp_22=`  col *= 1.0 - saturate(dist*1.4);
+comp_23=`  ret = col;
+comp_24=`}

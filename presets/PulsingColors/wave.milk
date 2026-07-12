@@ -1,0 +1,125 @@
+[preset00]
+// PulsingColors Wave
+// Polar-coordinate displacement with sin LUT angular modulation
+fRating=3.000000
+fGammaAdj=1.000000
+fVideoEchoZoom=1.000000
+fVideoEchoAngle=0.000000
+fWaveMode=0
+bWaveThick=false
+bAdditiveWaves=false
+bWaveDarken=false
+bSmooth=true
+bModWaveAlphaByVolume=false
+bModWaveAlphaReverse=false
+bInterlace=false
+bBrighten=false
+bDarken=false
+bSolarize=false
+fWaveAlpha=0.700000
+fWaveScale=1.000000
+fWaveSmoothing=0.500000
+fWaveAspect=1.000000
+fWarpAnimSpeed=1.000000
+fWarpScale=1.500000
+fZoomExponent=1.000000
+fZoom=1.000000
+fSpin=0.000000
+fZoomCamera=0.000000
+dx=0.000000
+dy=0.000000
+cx=0.500000
+cy=0.500000
+sx=1.000000
+sy=1.000000
+ob_size=0.000000
+ob_r=0.000000
+ob_g=0.000000
+ob_b=0.000000
+ob_a=0.000000
+ib_size=0.000000
+ib_r=0.000000
+ib_g=0.000000
+ib_b=0.000000
+ib_a=0.000000
+wave_r=0.500000
+wave_g=0.800000
+wave_b=1.000000
+wave_a=0.000000
+wave_mode=0
+wave_scale=1.000000
+wave_smoothing=0.500000
+wave_mystery=0.000000
+wave_aspect=1.000000
+fDecay=0.960000
+
+per_frame_1=t = time*0.5;
+per_frame_2=wave_speed = 1.0 + 0.5*bass;
+per_frame_3=wave_amp = 0.3 + 0.2*mid;
+per_frame_4=radius = 0.4 + 0.1*treb;
+per_frame_5=color_hue = t*0.3;
+per_frame_6=brightness = 0.7 + 0.3*bass;
+per_frame_7=zoom = 1.0 - 0.03*bass;
+per_frame_8=spin = 0.002*sin(t*0.8);
+per_frame_9=dx = 0.002*sin(t*1.2);
+per_frame_10=dy = 0.002*cos(t*0.9);
+
+per_pixel_1=ux = x - 0.5;
+per_pixel_2=uy = y - 0.5;
+per_pixel_3=dist = sqrt(ux*ux + uy*uy);
+per_pixel_4=ang = atan2(uy, ux);
+per_pixel_5=// Concentric wave rings from center
+per_pixel_6=wave_ring = sin(dist*20.0 - time*wave_speed*2.0);
+per_pixel_7=wave_ring = 0.5 + 0.5*wave_ring;
+per_pixel_8=// Angular modulation: waves vary around the circle
+per_pixel_9=ang_mod = sin(ang*3.0 + time*0.7);
+per_pixel_10=ang_mod = 0.5 + 0.5*ang_mod;
+per_pixel_11=// Combined wave pattern
+per_pixel_12=pattern = wave_ring * ang_mod;
+per_pixel_13=// Radial falloff
+per_pixel_14=falloff = 1.0 - dist/(radius + 0.01);
+per_pixel_15=falloff = max(falloff, 0.0);
+per_pixel_16=pattern = pattern * falloff * brightness;
+per_pixel_17=// Warp: radial displacement along wave
+per_pixel_18=warp = pattern * wave_amp * 0.03;
+per_pixel_19=dx = ux/dist * warp;
+per_pixel_20=dy = uy/dist * warp;
+
+comp_1=`shader_body
+comp_2=`{
+comp_3=`  float2 uv2 = uv - 0.5;
+comp_4=`  float dist = length(uv2);
+comp_5=`  float angle = atan2(uv2.y, uv2.x);
+comp_6=`
+comp_7=`  // Concentric wave rings
+comp_8=`  float wave_speed2 = 1.0 + 0.5*max(bass_att - 0.3, 0.0);
+comp_9=`  float rings = sin(dist*25.0 - time*wave_speed2*2.0);
+comp_10=`  rings = 0.5 + 0.5*rings;
+comp_11=`
+comp_12=`  // Angular modulation — wave varies around circle
+comp_13=`  float ang_mod = sin(angle*4.0 + time*0.8);
+comp_14=`  ang_mod = 0.5 + 0.5*ang_mod;
+comp_15=`  float pattern = rings * ang_mod;
+comp_16=`
+comp_17=`  // Radial falloff — waves fade at edges
+comp_18=`  float radius2 = 0.4 + 0.1*max(treble_att - 0.3, 0.0);
+comp_19=`  float falloff = 1.0 - saturate(dist / (radius2 + 0.01));
+comp_20=`  pattern *= falloff;
+comp_21=`
+comp_22=`  // Color: concentric hue rings
+comp_23=`  float hue = time*0.3 + dist*3.0;
+comp_24=`  float3 col;
+comp_25=`  col.r = 0.5 + 0.5*sin(hue);
+comp_26=`  col.g = 0.5 + 0.5*sin(hue + 2.094);
+comp_27=`  col.b = 0.5 + 0.5*sin(hue + 4.189);
+comp_28=`
+comp_29=`  // Apply wave pattern and color
+comp_30=`  col *= pattern * 1.5;
+comp_31=`  col += pow(pattern, 3.0) * float3(1.0, 0.8, 0.5) * 0.5;
+comp_32=`
+comp_33=`  // Bright center glow
+comp_34=`  float glow = exp(-dist*4.0) * 0.3;
+comp_35=`  col += glow * float3(0.8, 0.6, 1.0);
+comp_36=`
+comp_37=`  ret = col;
+comp_38=`}

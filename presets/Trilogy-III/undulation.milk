@@ -1,0 +1,167 @@
+[preset00]
+// Trilogy III - Undulation
+// Ported from WMP Visualization by Averett & Associates (2001)
+// Multi-directional wave undulation with edge-detection feel
+fRating=3.000000
+fGammaAdj=1.000000
+fVideoEchoZoom=1.000000
+fVideoEchoAngle=0.000000
+fWaveMode=2
+bWaveThick=true
+bAdditiveWaves=true
+bWaveDarken=false
+bSmooth=true
+bModWaveAlphaByVolume=false
+bModWaveAlphaReverse=false
+bInterlace=false
+bBrighten=false
+bDarken=false
+bSolarize=false
+fWaveAlpha=0.800000
+fWaveScale=1.200000
+fWaveSmoothing=0.600000
+fWaveAspect=1.000000
+fWarpAnimSpeed=1.000000
+fWarpScale=1.000000
+fZoomExponent=1.000000
+fZoom=1.000000
+fSpin=0.000000
+fZoomCamera=0.000000
+dx=0.000000
+dy=0.000000
+cx=0.500000
+cy=0.500000
+sx=1.000000
+sy=1.000000
+ob_size=0.000000
+ob_r=0.000000
+ob_g=0.000000
+ob_b=0.000000
+ob_a=0.000000
+ib_size=0.000000
+ib_r=0.000000
+ib_g=0.000000
+ib_b=0.000000
+ib_a=0.000000
+wave_r=0.600000
+wave_g=0.800000
+wave_b=1.000000
+wave_a=0.800000
+wave_mode=2
+wave_scale=1.000000
+wave_smoothing=0.500000
+wave_mystery=0.000000
+wave_aspect=1.000000
+fDecay=0.960000
+
+// Per-frame: undulating wave parameters with audio reactivity
+per_frame_1=t = time*0.5;
+per_frame_2=
+per_frame_3=// Multiple wave frequencies for undulation
+per_frame_4=q1 = sin(t*1.0)*bass;
+per_frame_5=q2 = cos(t*0.7)*mid;
+per_frame_6=q3 = sin(t*1.3)*treb;
+per_frame_7=
+per_frame_8=// Wave amplitude modulation
+per_frame_9=amp = 0.5 + 0.5*bass;
+per_frame_10=
+per_frame_11=// Horizontal and vertical undulation
+per_frame_12=dx = 0.005*sin(t*0.8 + q1);
+per_frame_13=dy = 0.005*cos(t*0.6 + q2);
+per_frame_14=
+per_frame_15=// Gentle zoom pulse
+per_frame_16=zoom = 1.0 - 0.02*amp;
+per_frame_17=
+per_frame_18=// Subtle rotation with bass
+per_frame_19=spin = 0.001*sin(t*0.3)*bass;
+
+// Per-pixel: edge-distance undulation
+per_pixel_1=
+per_pixel_2=// Compute distance to nearest edge (Manhattan-like)
+per_pixel_3=ex = abs(x-0.5)*2.0;
+per_pixel_4=ey = abs(y-0.5)*2.0;
+per_pixel_5=edge_dist = max(ex, ey);
+per_pixel_6=
+per_pixel_7=// Wave modulation based on distance
+per_pixel_8=wave_factor = sin(edge_dist*10.0 - time*2.0);
+per_pixel_9=
+per_pixel_10=// Radial undulation
+per_pixel_11=rad = sqrt((x-0.5)*(x-0.5) + (y-0.5)*(y-0.5));
+per_pixel_12=radial_wave = sin(rad*15.0 - time*1.5);
+per_pixel_13=
+per_pixel_14=// Combine for zoom distortion
+per_pixel_15=zoom = 0.97 + 0.03*wave_factor*radial_wave;
+
+// Composite shader: undulating waves with edge detection feel
+comp_1=`shader_body
+comp_2=`{
+comp_3=`  // Multi-directional wave scan (Manhattan distance transform feel)
+comp_4=`  float2 uv2 = uv - 0.5;
+comp_5=`  float ex = abs(uv2.x) * 2.0;
+comp_6=`  float ey = abs(uv2.y) * 2.0;
+comp_7=`  float edge_dist = max(ex, ey);
+comp_8=`
+comp_9=`  // Undulating waves from multiple directions
+comp_10=`  float wave_h = sin(uv.x * 12.0 - time * 1.5) * 0.5 + 0.5;
+comp_11=`  float wave_v = cos(uv.y * 10.0 + time * 1.2) * 0.5 + 0.5;
+comp_12=`  float wave_r = sin(length(uv2) * 15.0 - time * 1.0) * 0.5 + 0.5;
+comp_13=`
+comp_14=`  // Combine wave directions
+comp_15=`  float undulation = wave_h * 0.4 + wave_v * 0.4 + wave_r * 0.2;
+comp_16=`
+comp_17=`  // Edge detection effect: bright at edges, dark in center
+comp_18=`  float edge = smoothstep(0.0, 0.5, edge_dist) * (1.0 - smoothstep(0.5, 1.0, edge_dist));
+comp_19=`
+comp_20=`  // Audio-reactive intensity
+comp_21=`  float intensity = 0.5 + 0.5 * tex2D(sampler_fc_main, uv).a;
+comp_22=`
+comp_23=`  // Color: cool blues with white edges
+comp_24=`  float3 deep = float3(0.05, 0.1, 0.3);
+comp_25=`  float3 mid = float3(0.1, 0.3, 0.6);
+comp_26=`  float3 bright = float3(0.4, 0.7, 1.0);
+comp_27=`  float3 white = float3(0.9, 0.95, 1.0);
+comp_28=`
+comp_29=`  // Gradient based on undulation
+comp_30=`  float3 col;
+comp_31=`  if (undulation < 0.33) col = lerp(deep, mid, undulation / 0.33);
+comp_32=`  else if (undulation < 0.66) col = lerp(mid, bright, (undulation - 0.33) / 0.33);
+comp_33=`  else col = lerp(bright, white, (undulation - 0.66) / 0.34);
+comp_34=`
+comp_35=`  // Edge highlight
+comp_36=`  col += edge * float3(0.2, 0.3, 0.5) * (0.5 + 0.5*sin(time));
+comp_37=`
+comp_38=`  // Fade at edges
+comp_39=`  float fade = 1.0 - smoothstep(0.6, 1.0, length(uv2));
+comp_40=`  col *= fade;
+comp_41=`
+comp_42=`  ret = col;
+comp_43=`}
+
+// Wave objects for additional undulation layers
+wavecode_0_enabled=1
+wavecode_0_mode=2
+wavecode_0_bDrawThick=1
+wavecode_0_bAdditive=1
+wavecode_0_scaling=1.000000
+wavecode_0_smoothing=0.500000
+wavecode_0_r=0.200000
+wavecode_0_g=0.500000
+wavecode_0_b=1.000000
+wavecode_0_a=0.800000
+wave_0_per_point1=x = 0.5 + 0.4*sin(sample*3.14159*2.0 + time);
+wave_0_per_point2=y = 0.5 + 0.1*sin(sample*6.28318 + time*1.5)*bass;
+wave_0_per_point3=a = 0.3 + 0.3*sample;
+
+wavecode_1_enabled=1
+wavecode_1_mode=0
+wavecode_1_bDrawThick=0
+wavecode_1_bAdditive=1
+wavecode_1_scaling=1.000000
+wavecode_1_smoothing=0.700000
+wavecode_1_r=0.400000
+wavecode_1_g=0.200000
+wavecode_1_b=0.800000
+wavecode_1_a=0.600000
+wave_1_per_point1=x = sample;
+wave_1_per_point2=y = 0.5 + 0.15*sin(sample*12.566 + time*2.0)*mid;
+wave_1_per_point3=a = 0.2 + 0.4*abs(sin(sample*3.14159));

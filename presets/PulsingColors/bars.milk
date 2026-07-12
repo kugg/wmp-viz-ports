@@ -1,0 +1,121 @@
+[preset00]
+// PulsingColors Bars
+// Cross-shaped box blur with audio-reactive radius and HSL color rotation
+fRating=3.000000
+fGammaAdj=1.000000
+fVideoEchoZoom=1.000000
+fVideoEchoAngle=0.000000
+fWaveMode=0
+bWaveThick=false
+bAdditiveWaves=false
+bWaveDarken=false
+bSmooth=true
+bModWaveAlphaByVolume=false
+bModWaveAlphaReverse=false
+bInterlace=false
+bBrighten=false
+bDarken=false
+bSolarize=false
+fWaveAlpha=0.700000
+fWaveScale=1.000000
+fWaveSmoothing=0.500000
+fWaveAspect=1.000000
+fWarpAnimSpeed=1.000000
+fWarpScale=1.500000
+fZoomExponent=1.000000
+fZoom=1.000000
+fSpin=0.000000
+fZoomCamera=0.000000
+dx=0.000000
+dy=0.000000
+cx=0.500000
+cy=0.500000
+sx=1.000000
+sy=1.000000
+ob_size=0.000000
+ob_r=0.000000
+ob_g=0.000000
+ob_b=0.000000
+ob_a=0.000000
+ib_size=0.000000
+ib_r=0.000000
+ib_g=0.000000
+ib_b=0.000000
+ib_a=0.000000
+wave_r=1.000000
+wave_g=1.000000
+wave_b=1.000000
+wave_a=0.000000
+wave_mode=0
+wave_scale=1.000000
+wave_smoothing=0.500000
+wave_mystery=0.000000
+wave_aspect=1.000000
+fDecay=0.950000
+
+per_frame_1=t = time*0.4;
+per_frame_2=blur_radius = 2.0 + 6.0*bass;
+per_frame_3=hue_shift = hue_shift + 0.02 + 0.01*treb;
+per_frame_4=target_r = 0.5 + 0.5*sin(hue_shift);
+per_frame_5=target_g = 0.5 + 0.5*sin(hue_shift + 2.094);
+per_frame_6=target_b = 0.5 + 0.5*sin(hue_shift + 4.189);
+per_frame_7=zoom = 1.0 - 0.02*bass;
+per_frame_8=dx = 0.001*sin(t*0.7);
+per_frame_9=dy = 0.001*cos(t*0.5);
+
+per_pixel_1=ux = x - 0.5;
+per_pixel_2=uy = y - 0.5;
+per_pixel_3=dist = sqrt(ux*ux + uy*uy);
+per_pixel_4=ang = atan2(uy, ux);
+per_pixel_5=// Cross-shaped distance: bars extend along axes
+per_pixel_6=cross_dist = abs(ux) + abs(uy);
+per_pixel_7=// Bar pulse: thicker near center, modulated by blur_radius
+per_pixel_8=bar_width = 0.05 + 0.1*bass;
+per_pixel_9=min_ux_uy = min(abs(ux), abs(uy));
+per_pixel_10=t_bar = (min_ux_uy - bar_width) * 50.0;
+per_pixel_11=t_bar = min(max(t_bar, 0.0), 1.0);
+per_pixel_12=bar = 1.0 - t_bar*t_bar*(3.0 - 2.0*t_bar);
+per_pixel_13=falloff = 1.0 - dist*1.5;
+per_pixel_14=falloff = max(falloff, 0.0);
+per_pixel_15=bright = bar * falloff;
+per_pixel_16=warp_x = bright * sign(ux) * 0.01;
+per_pixel_17=warp_y = bright * sign(uy) * 0.01;
+per_pixel_18=dx = warp_x;
+per_pixel_19=dy = warp_y;
+
+comp_1=`shader_body
+comp_2=`{
+comp_3=`  float2 uv2 = uv - 0.5;
+comp_4=`  float dist = length(uv2);
+comp_5=`  float angle = atan2(uv2.y, uv2.x);
+comp_6=`
+comp_7=`  // Cross-shaped bars: horizontal + vertical bars
+comp_8=`  float bar_h = 1.0 - smoothstep(0.02, 0.08, abs(uv2.y));
+comp_9=`  float bar_v = 1.0 - smoothstep(0.02, 0.08, abs(uv2.x));
+comp_10=`  float bars = max(bar_h, bar_v);
+comp_11=`
+comp_12=`  // Audio-reactive blur radius spreads the bars
+comp_13=`  float spread = 0.02 + 0.08*max(bass_att - 0.3, 0.0);
+comp_14=`  float blurred = 0.0;
+comp_15=`  for (int i = -3; i <= 3; i++) {
+comp_16=`    float fi = float(i) * spread;
+comp_17=`    blurred += tex2D(sampler_main, uv + float2(fi, 0)).a;
+comp_18=`    blurred += tex2D(sampler_main, uv + float2(0, fi)).a;
+comp_19=`  }
+comp_20=`  blurred /= 14.0;
+comp_21=`
+comp_22=`  // Combine bar structure with blurred color
+comp_23=`  float3 bar_col = tex2D(sampler_main, uv).rgb;
+comp_24=`  float3 blur_col = tex2D(sampler_main, uv + float2(blurred*0.01, blurred*0.01)).rgb;
+comp_25=`
+comp_26=`  // HSL color rotation
+comp_27=`  float hue = time*0.3 + dist*2.0;
+comp_28=`  float3 shift = float3(0.5+0.5*sin(hue), 0.5+0.5*sin(hue+2.094), 0.5+0.5*sin(hue+4.189));
+comp_29=`
+comp_30=`  // Mix bar color with blurred color, apply hue shift
+comp_31=`  float3 col = lerp(bar_col, blur_col, 0.3) * (0.5 + 0.5*bars);
+comp_32=`  col *= 0.6 + 0.4*shift;
+comp_33=`  col *= 1.0 - saturate(dist*1.5);
+comp_34=`
+comp_35=`  ret = col;
+comp_36=`}

@@ -1,0 +1,491 @@
+---
+name: port-wmp-viz
+description: Port Windows Media Player visualization plugins (.exe/.dll) to ProjectM/MilkDrop .milk presets via Ghidra reverse engineering. Triggers on keywords: WMP visualization, port visualization, wmpvis, milkdrop preset, disassemble viz.
+---
+
+# Port WMP Visualizations to ProjectM MilkDrop Presets
+
+Step-by-step workflow for extracting, reverse engineering, and porting Windows Media Player visualization DLLs to ProjectM `.milk` presets.
+
+## Prerequisites
+
+| Tool | Install | Notes |
+|------|---------|-------|
+| **Ghidra** | `brew install --cask ghidra` or [download](https://github.com/NationalSecurityAgency/ghidra/releases) | 12.x+ recommended |
+| **Java 21+** | `brew install openjdk@21` | Required by Ghidra — verify with `java -version` |
+| **cabextract** | `brew install cabextract` | Extracts MS CAB archives |
+| **ProjectM** | [Build from source](https://github.com/projectm-visualizer/projectm) | For testing presets |
+| **Python 3** | System default | For the syntax validator |
+| **C++ compiler** | Xcode/clang or gcc | For the C++ validation tools |
+| **(Optional) gh** | `brew install gh` | For publishing presets to GitHub |
+
+### macOS Notes
+- `cabextract` is available via Homebrew: `brew install cabextract`
+- On Apple Silicon, build ProjectM arm64 core + x86_64 SDL2 test UI (for Rosetta compatibility with x86_64 Homebrew SDL2)
+- No `sudo` needed — use `~/.projectM/` for config and presets
+
+## Step 1: Set Up Project Directory
+
+```bash
+WORKDIR=~/devel/wmp-viz-port
+mkdir -p "$WORKDIR"/{extracted,ghidra-project,output}
+```
+
+## Step 2: Extract the DLL from the Installer
+
+WMP viz `.exe` files are typically **MS CAB self-extracting archives**:
+
+```bash
+# Check file type
+file /path/to/vizname.exe
+# Expected: PE32 executable ... MS CAB self-extracting archive
+
+# Extract
+cd "$WORKDIR/extracted"
+cabextract ../vizname.exe
+```
+
+This yields:
+- `VizName.dll` — the visualization COM DLL
+- `VizName.inf` — install config (viz name, description, COM registration)
+- Installer infrastructure DLLs — ignore
+
+### Embedded CAB (non-standard offsets)
+
+Some `.exe` files have a CAB embedded at a non-zero offset (not at byte 0). Find and extract it:
+
+```python
+# Find the CAB offset
+with open("vizname.exe", "rb") as f:
+    data = f.read()
+    offset = data.find(b'MSCF')
+    print(f"CAB found at offset: {offset}")
+
+# Extract the CAB slice
+with open("vizname.exe", "rb") as f:
+    f.seek(offset)
+    cab_data = f.read()
+    with open("embedded.cab", "wb") as out:
+        out.write(cab_data)
+
+# Then extract
+cabextract embedded.cab
+```
+
+### Read the .inf for metadata
+
+```bash
+cat VizName.inf
+# Look for: description, COM class ID, viz names
+# Example: val description = s 'Trilogy III - Lava'
+```
+
+## Step 3: DLL Recon
+
+```bash
+# File type
+file extracted/VizName.dll
+
+# Key strings — viz names, APIs, COM interfaces
+strings extracted/VizName.dll | grep -iE "render|direct|d3d|ddraw|audio|fft|color|blend|CLSID|IID"
+
+# COM class ID
+strings extracted/VizName.dll | grep -i "CLSID\|classid"
+
+# Rendering API
+strings extracted/VizName.dll | grep -i "DDRAW\|D3D\|BitBlt\|StretchDIBits"
+```
+
+## Step 4: Ghidra Headless Analysis
+
+### First Pass — Import and Auto-Analyze
+
+```bash
+GHIDRA_PATH=/path/to/ghidra_XXXX_PUBLIC/support
+
+"$GHIDRA_PATH/analyzeHeadless" "$WORKDIR/ghidra-project" VizName \
+  -import "$WORKDIR/extracted/VizName.dll" \
+  -processor x86:LE:32:default \
+  -analysisTimeoutPerFile 300
+```
+
+### Decompile All Functions
+
+Use the `DumpDecompiled.java` script (see Appendix A):
+
+```bash
+# Copy script to Ghidra scripts dir (required — Ghidra caches scripts)
+cp DumpDecompiled.java /path/to/ghidra/Ghidra/Features/Base/ghidra_scripts/
+
+# Run decompilation
+"$GHIDRA_PATH/analyzeHeadless" "$WORKDIR/ghidra-project" VizName \
+  -process VizName.dll \
+  -noanalysis \
+  -scriptPath "$WORKDIR" \
+  -postScript DumpDecompiled.java "$WORKDIR/output"
+```
+
+Output: `$WORKDIR/output/decompiled_VizName.txt`
+
+**Important**: Ghidra caches scripts internally. Always `cp` updated scripts to the Ghidra scripts directory, even when using `-scriptPath`.
+
+## Step 5: Identify the Renderers
+
+```bash
+# Named functions (skip internal FUN_xxxxxxxx)
+grep "Function:" decompiled_output.txt | grep -v "FUN_"
+
+# Largest functions (likely renderers) — sort by line count
+awk '/^\/\/ Function:/{name=$0; start=NR} /^====/{if(start && NR-start > 100) print start, NR-start, name}' \
+  decompiled_output.txt | sort -k2 -rn | head -20
+
+# Rendering API calls
+grep -n "DirectDraw\|CreateSurface\|BitBlt\|StretchDIBits\|SetPalette" decompiled_output.txt
+
+# Math operations (identifies coordinate transforms)
+grep -n "sin\|cos\|sqrt\|pow\|atan\|__ftol" decompiled_output.txt
+
+# Audio data flow
+grep -n "peak\|level\|frequency\|spectrum\|waveform\|audioData" decompiled_output.txt
+```
+
+### Key Architecture Patterns
+
+- **COM-based**: All WMP viz are COM objects implementing vtable-based interfaces
+- **Shared pipeline**: Multiple visualizations share the same render infrastructure — different vis = different parameter set
+- **State struct**: ~50KB struct with sin LUT, audio peaks, framebuffer pointers, per-vis params at fixed offsets
+- **Sin LUT**: 360-entry float table at a fixed offset — used to identify angle parameters
+- **Audio peaks**: Normalized to [0,1] by dividing by 255.0, stored at fixed stride (e.g. `0xE0` bytes)
+- **DirectDraw**: Most use DirectDraw + GDI for final compositing
+
+## Step 6: Analyze the Algorithms
+
+For each visualization renderer, identify:
+
+1. **Coordinate system** — cartesian, polar, screen-space
+2. **Color math** — interpolation, channel rotation, HSV, easing functions
+3. **Audio reactivity** — which audio bands drive which parameters
+4. **Effects** — blur, edge detection, distance fields, noise
+5. **Warp/distortion** — how the coordinate space is distorted
+6. **Shapes/geometry** — what shapes are drawn and how
+
+Document each in a `PORT_PLAN.md` file.
+
+## Step 7: Map to .milk Preset Format
+
+### EEL vs HLSL — Know the Limits
+
+| Feature | Per-frame/per-pixel EEL | HLSL (composite/warp shaders) |
+|---------|------------------------|-------------------------------|
+| `sin()`, `cos()`, `atan2()`, `sqrt()`, `abs()` | ✅ | ✅ |
+| `max()`, `min()`, `pow()` | ✅ | ✅ |
+| `mod()` | ✅ | ✅ (`fmod` also works) |
+| `step()`, `smoothstep()`, `saturate()`, `lerp()` | ❌ | ✅ |
+| `select()` | ❌ | ❌ |
+| `if/else` blocks | ❌ | ✅ |
+| `if(cond, a, b)` ternary | ✅ (3 args only) | N/A |
+| `floor()`, `ceil()`, `round()` | ❌ | ✅ |
+| `fmod()` | ❌ | ✅ |
+| `tex2D()` | ❌ | ✅ |
+| `for` loops | ❌ | ✅ |
+
+### EEL Workarounds
+
+```
+select(c, a, b)       →  c*a + (1-c)*b
+if (c) x = a          →  x = c*a + (1-c)*x
+step(thresh, val)     →  (val > thresh)
+smoothstep(a, b, x)   →  t = min(max((x-a)/(b-a), 0), 1); t*t*(3-2*t)
+clamp(x, lo, hi)      →  min(max(x, lo), hi)
+fmod(a, b)            →  avoid entirely in per-pixel (no floor available)
+```
+
+### Audio Variables
+
+| Variable | Description |
+|----------|-------------|
+| `bass`, `mid`, `treb` | Raw peak levels (0-1) |
+| `bass_att`, `mid_att`, `treble_att` | Attenuated/averaged (smooth) |
+| `time` | Seconds since start |
+
+### .milk File Structure
+
+```ini
+[preset00]
+// Header: fRating, fGammaAdj, fVideoEchoZoom, etc.
+// Wave/shape definitions
+// Per-frame equations
+// Per-pixel equations
+// Warp shader (HLSL with backtick line continuation)
+// Composite shader (HLSL)
+```
+
+**Critical formatting rules**:
+- Per-pixel/per-frame lines must be sequentially numbered: `per_pixel_1=`, `per_pixel_2=`, etc.
+- Gaps in numbering terminate the parser — never skip numbers
+- Comment-only lines (`per_pixel_5=// comment`) occupy a line number
+- Composite shader lines use backtick (`` ` ``) for continuation: `` comp_1=`shader_body ``
+
+## Step 8: Write the Preset
+
+### Approach
+
+1. **Start with composite shader** — get the visual effect right in HLSL first (full language support)
+2. **Extract to per-frame/per-pixel** — move what can be expressed in EEL for performance
+3. **Add audio reactivity** — use `bass_att`/`mid_att`/`treble_att` for smooth response
+4. **Test iteratively** — validate syntax, then test visually
+
+### Minimum Viable Preset
+
+```ini
+[preset00]
+fRating=3.000000
+fGammaAdj=1.000000
+fVideoEchoZoom=1.000000
+fVideoEchoAngle=0.000000
+fWaveMode=0
+bWaveThick=false
+bAdditiveWaves=false
+bWaveDarken=false
+bSmooth=true
+bModWaveAlphaByVolume=false
+bModWaveAlphaReverse=false
+bInterlace=false
+bBrighten=false
+bDarken=false
+bSolarize=false
+fWaveAlpha=0.700000
+fWaveScale=1.000000
+fWaveSmoothing=0.500000
+fWaveAspect=1.000000
+fWarpAnimSpeed=1.000000
+fWarpScale=1.500000
+fZoomExponent=1.000000
+fZoom=1.000000
+fSpin=0.000000
+fZoomCamera=0.000000
+dx=0.000000
+dy=0.000000
+cx=0.500000
+cy=0.500000
+sx=1.000000
+sy=1.000000
+ob_size=0.000000
+ob_r=0.000000
+ob_g=0.000000
+ob_b=0.000000
+ob_a=0.000000
+ib_size=0.000000
+ib_r=0.000000
+ib_g=0.000000
+ib_b=0.000000
+ib_a=0.000000
+wave_r=1.000000
+wave_g=1.000000
+wave_b=1.000000
+wave_a=0.500000
+wave_mode=0
+wave_scale=1.000000
+wave_smoothing=0.500000
+wave_mystery=0.000000
+wave_aspect=1.000000
+fDecay=0.970000
+
+per_frame_1=t = time;
+
+comp_1=`shader_body
+comp_2=`{
+comp_3=`  ret = float3(0, 0, 0);
+comp_4=`}
+```
+
+## Step 9: Validate and Test
+
+### Python Syntax Validator
+
+```bash
+python3 validate_milk.py preset.milk
+```
+
+Checks: sequential numbering, valid EEL syntax, header completeness, shader structure.
+
+### C++ PresetFileParser (Semantic)
+
+```bash
+g++ -std=c++17 \
+  -I./projectm/src/libprojectM \
+  -I./projectm/vendor/hlslparser/src \
+  -I./projectm/src/api/include \
+  -I./projectm/build/src/api/include \
+  test_parser.cpp \
+  ./projectm/build/src/libprojectM/MilkdropPreset/CMakeFiles/MilkdropPreset.dir/PresetFileParser.cpp.o \
+  -o test_parser
+./test_parser preset1.milk preset2.milk
+```
+
+This actually compiles the EEL and HLSL — catches runtime errors the Python validator misses.
+
+### Visual Test with ProjectM
+
+```bash
+# Copy presets
+mkdir -p ~/.projectM/presets
+cp *.milk ~/.projectM/presets/
+
+# Run from config dir
+cd ~/.projectM
+/path/to/projectm/build/src/sdl-test-ui/projectM-Test-UI
+```
+
+- Arrow keys cycle presets
+- `F` toggles fullscreen
+- No audio required — renders with synthetic audio
+- Look for `ERROR` lines in output — those are EEL/HLSL compilation failures
+
+## Step 10: Iterate
+
+1. Start with the simplest visualization
+2. Create a minimal preset
+3. Test, observe, adjust
+4. Add audio reactivity
+5. Move to the next visualization
+6. Tune transitions between presets
+
+## Common WMP → MilkDrop Mapping
+
+| WMP Type | MilkDrop Approach |
+|----------|-------------------|
+| Perlin noise | Warp shader with noise + blur |
+| Particles | Shape objects with `t`-based animation |
+| Waveforms | Wave objects with `wave_mode` |
+| Geometric rotation | Composite shader with rotation matrix |
+| Distance fields | Warp shader with `atan2`/`sqrt` |
+| Color cycling | Composite shader with `sin(time + phase)` |
+| Pixel manipulation | Warp shader texture reads |
+
+## Appendix A: DumpDecompiled.java
+
+```java
+// @category Analysis
+// Usage: analyzeHeadless ... -postScript DumpDecompiled.java [output_dir]
+import ghidra.app.decompiler.DecompInterface;
+import ghidra.app.decompiler.DecompileResults;
+import ghidra.app.script.GhidraScript;
+import ghidra.program.model.listing.Function;
+import ghidra.program.model.listing.FunctionIterator;
+import java.io.File;
+import java.io.FileWriter;
+import java.io.PrintWriter;
+import java.util.List;
+
+public class DumpDecompiled extends GhidraScript {
+    @Override
+    public void run() throws Exception {
+        List<String> args = getScriptArgs();
+        String progName = currentProgram.getName();
+        String stem = progName.replace(".dll", "").replace(".DLL", "");
+        String outputDir;
+        if (args.size() >= 1) {
+            outputDir = args.get(0);
+        } else {
+            File exePath = new File(currentProgram.getExecutablePath());
+            outputDir = exePath.getParent();
+        }
+        File outDir = new File(outputDir);
+        if (!outDir.exists()) outDir.mkdirs();
+        String outputPath = outputDir + File.separator + "decompiled_" + stem + ".txt";
+
+        DecompInterface decomp = new DecompInterface();
+        decomp.openProgram(currentProgram);
+        PrintWriter pw = new PrintWriter(new FileWriter(outputPath));
+        pw.println("=== DECOMPILED FUNCTIONS: " + progName + " ===\n");
+        int count = 0;
+        FunctionIterator funcs = currentProgram.getFunctionManager().getFunctions(true);
+        while (funcs.hasNext()) {
+            Function func = funcs.next();
+            DecompileResults result = decomp.decompileFunction(func, 30, monitor);
+            pw.println("======================================================================");
+            pw.println("// Function: " + func.getName() + " @ " + func.getEntryPoint());
+            pw.println("======================================================================");
+            if (result != null && result.decompileCompleted()) {
+                String c = result.getDecompiledFunction().getC();
+                pw.println(c != null ? c : "// <no decompilation>");
+            } else {
+                pw.println("// <decompilation failed>");
+            }
+            pw.println("\n");
+            count++;
+        }
+        pw.println("\n=== TOTAL: " + count + " functions ===");
+        pw.flush(); pw.close();
+        println("Dumped " + count + " functions to " + outputPath);
+        decomp.dispose();
+    }
+}
+```
+
+## Appendix B: Python Syntax Validator
+
+```python
+#!/usr/bin/env python3
+"""Validate a .milk preset file for common issues."""
+import sys, re
+
+def validate(path):
+    errors = []
+    with open(path) as f:
+        lines = f.readlines()
+
+    if not lines or not lines[0].strip().startswith("[preset"):
+        errors.append("Missing [preset00] header")
+
+    sections = {"per_frame": [], "per_pixel": [], "comp": [], "warp": []}
+    for i, line in enumerate(lines, 1):
+        line = line.strip()
+        for prefix in sections:
+            m = re.match(rf"{prefix}_(\d+)=(.*)", line)
+            if m:
+                num = int(m.group(1))
+                sections[prefix].append((i, num, m.group(2)))
+
+    for name, items in sections.items():
+        if not items:
+            continue
+        nums = [n for _, n, _ in items]
+        expected = list(range(1, max(nums) + 1))
+        missing = set(expected) - set(nums)
+        if missing:
+            errors.append(f"{name}: missing lines {sorted(missing)}")
+        dupes = [n for n in nums if nums.count(n) > 1]
+        if dupes:
+            errors.append(f"{name}: duplicate line numbers {sorted(set(dupes))}")
+
+    if errors:
+        print(f"FAIL {path}:")
+        for e in errors:
+            print(f"  {e}")
+        return 1
+    print(f"OK {path}")
+    return 0
+
+if __name__ == "__main__":
+    sys.exit(sum(validate(p) for p in sys.argv[1:]))
+```
+
+## Appendix C: C++ Validation Build
+
+```bash
+# Build the test_parser (requires ProjectM source and build)
+g++ -std=c++17 \
+  -I./projectm/src/libprojectM \
+  -I./projectm/vendor/hlslparser/src \
+  -I./projectm/src/api/include \
+  -I./projectm/build/src/api/include \
+  test_parser.cpp \
+  ./projectm/build/src/libprojectM/MilkdropPreset/CMakeFiles/MilkdropPreset.dir/PresetFileParser.cpp.o \
+  -o test_parser
+
+# Usage
+./test_parser preset1.milk preset2.milk preset3.milk
+# Exit code 0 = all pass, 1 = any fail
+```

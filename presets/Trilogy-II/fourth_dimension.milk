@@ -1,0 +1,107 @@
+[preset00]
+// Trilogy II - 4th Dimension
+// Geometric transform chain: 3D rotation + coordinate modes + oscillation/shear
+fRating=3.000000
+fGammaAdj=1.000000
+fVideoEchoZoom=1.000000
+fVideoEchoAngle=0.000000
+fWaveMode=0
+bWaveThick=false
+bAdditiveWaves=false
+bWaveDarken=false
+bSmooth=true
+bModWaveAlphaByVolume=false
+bModWaveAlphaReverse=false
+bInterlace=false
+bBrighten=false
+bDarken=false
+bSolarize=false
+fWaveAlpha=0.700000
+fWaveScale=1.000000
+fWaveSmoothing=0.500000
+fWaveAspect=1.000000
+fWarpAnimSpeed=1.000000
+fWarpScale=1.500000
+fZoomExponent=1.000000
+fZoom=1.000000
+fSpin=0.000000
+fZoomCamera=0.000000
+dx=0.000000
+dy=0.000000
+cx=0.500000
+cy=0.500000
+sx=1.000000
+sy=1.000000
+ob_size=0.000000
+ob_r=0.000000
+ob_g=0.000000
+ob_b=0.000000
+ob_a=0.000000
+ib_size=0.000000
+ib_r=0.000000
+ib_g=0.000000
+ib_b=0.000000
+ib_a=0.000000
+wave_r=0.500000
+wave_g=0.800000
+wave_b=1.000000
+wave_a=0.000000
+wave_mode=0
+wave_scale=1.000000
+wave_smoothing=0.500000
+wave_mystery=0.000000
+wave_aspect=1.000000
+fDecay=0.950000
+
+per_frame_1=t = time*0.3;
+per_frame_2=rot_x = t*0.7;
+per_frame_3=rot_y = t*1.1;
+per_frame_4=rot_z = t*0.5;
+per_frame_5=osc_amp = 0.3 + 0.2*bass;
+per_frame_6=shear_x = 0.1*sin(t*0.8);
+per_frame_7=shear_y = 0.1*cos(t*0.6);
+per_frame_8=trans_x = 0.05*sin(t*1.2);
+per_frame_9=trans_y = 0.05*cos(t*0.9);
+per_frame_10=zoom = 1.0 - 0.03*bass;
+per_frame_11=spin = 0.001*sin(t*0.5);
+
+per_pixel_1=ux = x - 0.5;
+per_pixel_2=uy = y - 0.5;
+per_pixel_3=osc = sin(uy*6.2832 + time*2.0)*osc_amp;
+per_pixel_4=ux2 = ux + osc*0.1;
+per_pixel_5=uy2 = uy + sin(ux*4.4 + time*1.5)*osc_amp*0.1;
+per_pixel_6=cz = cos(rot_z);
+per_pixel_7=sz = sin(rot_z);
+per_pixel_8=rx = ux2*cz - uy2*sz;
+per_pixel_9=ry = ux2*sz + uy2*cz;
+per_pixel_10=srx = rx*shear_x;
+per_pixel_11=sry = ry*shear_y;
+per_pixel_12=rx2 = rx + sry;
+per_pixel_13=ry2 = ry + srx;
+per_pixel_14=dx = rx2*0.15 + trans_x;
+per_pixel_15=dy = ry2*0.15 + trans_y;
+
+comp_1=`shader_body
+comp_2=`{
+comp_3=`  float2 uv2 = uv - 0.5;
+comp_4=`  float dist = length(uv2);
+comp_5=`  float angle = atan2(uv2.y, uv2.x);
+comp_6=`  float t2 = time * 0.3;
+comp_7=`  float cx2 = cos(t2*0.7), sx2 = sin(t2*0.7);
+comp_8=`  float cy2 = cos(t2*1.1), sy2 = sin(t2*1.1);
+comp_9=`  float cz2 = cos(t2*0.5), sz2 = sin(t2*0.5);
+comp_10=`  float rx = uv2.x*cz2 - uv2.y*sz2;
+comp_11=`  float ry = uv2.x*sz2 + uv2.y*cz2;
+comp_12=`  float rz = rx*cy2 - (uv2.x*0.3)*sy2;
+comp_13=`  float px = rx / max(abs(rz) + 0.3, 0.01);
+comp_14=`  float py = ry / max(abs(rz) + 0.3, 0.01);
+comp_15=`  float grid = 0.0;
+comp_16=`  float gx = abs(fmod(px*4.0, 1.0) - 0.5);
+comp_17=`  float gy = abs(fmod(py*4.0, 1.0) - 0.5);
+comp_18=`  grid = max(smoothstep(0.45, 0.5, gx), smoothstep(0.45, 0.5, gy));
+comp_19=`  float depth = 1.0 - saturate(length(float2(px, py))*0.5);
+comp_20=`  float3 col = float3(0.2, 0.3, 0.8) * grid * depth;
+comp_21=`  col += float3(0.5, 0.2, 0.8) * pow(grid, 3.0) * 2.0;
+comp_22=`  col += float3(0.1, 0.1, 0.3) * (1.0 - grid) * depth;
+comp_23=`  ret = col;
+comp_24=`}
