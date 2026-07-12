@@ -51,7 +51,7 @@ wave_scale=1.000000
 wave_smoothing=0.300000
 wave_mystery=0.000000
 wave_aspect=1.000000
-fDecay=1.000000
+fDecay=0.000000
 
 per_frame_1=wave_a = 0;
 
