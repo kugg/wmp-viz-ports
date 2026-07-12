@@ -140,6 +140,59 @@ Confirmed working preset
 
 These ports were created by reverse-engineering the original WMP visualization DLLs with Ghidra, analyzing the algorithms, and translating them to MilkDrop/EEL/HLSL presets for use with ProjectM.
 
+## Lessons Learned
+
+### Rendering Pipeline (Critical)
+
+Understanding the frame rendering order is essential:
+
+```
+Frame N:
+1. WARP: reads previous frame, applies zoom/dx/dy/rot + per-pixel equations
+   → fDecay multiplies previous frame (0=discard, 0.95=trails, 1.0=infinite)
+2. CUSTOM SHAPES (0-15)
+3. CUSTOM WAVEFORMS (0-3) — per_point code runs here
+4. BUILT-IN WAVEFORM
+5. DARKEN CENTER
+6. BORDER
+7. COMPOSITE: reads current frame, writes to previous frame buffer
+8. SWAP: current ↔ previous
+```
+
+**Key insight**: Composite output feeds back through warp next frame. With `fDecay=1.0`, this causes infinite accumulation ("lava" effect). With `fDecay=0.0`, nothing persists (black screen).
+
+### Spectrum Analyzer Pattern
+
+ProjectM's FFT equalization suppresses low frequencies heavily (DC=0, bass≈0.00004, treble≈0.125). The `value1` variable in custom waveforms is **not** raw FFT magnitude — it's equalized and scaled.
+
+**Working pattern for spectrum displays**:
+```ini
+per_frame_1=warp = 0;            # MUST disable warp for static displays
+per_frame_2=wave_a = 0;          # Hide built-in wave
+
+wavecode_0_enabled=1
+wavecode_0_bSpectrum=1           # value1 = FFT magnitude
+wavecode_0_samples=512           # Max frequency resolution
+wavecode_0_scaling=0.5           # Amplify spectrum
+wavecode_0_smoothing=0.5         # Temporal smoothing
+wavecode_0_bUseDots=0            # Connected polyline
+wavecode_0_bAdditive=0           # Opaque (not additive)
+
+# CRITICAL: Multiply value1 by 10x+ to compensate for FFT equalization
+wave_0_per_point1=x = sample;
+wave_0_per_point2=y = 0.5 - value1 * 10.0;
+```
+
+### Common Pitfalls
+
+1. **NOT setting `warp=0`** → causes lava/flow distortion
+2. **`fDecay=1.0`** → causes accumulation/lava effect
+3. **`fDecay=0.0`** → causes black screen (no persistence)
+4. **Using composite shader for basic rendering** → most presets don't need it
+5. **Using `if/else` blocks in per-point EEL** → fails silently
+6. **Using `floor()`, `fract()`, `step()` in per-point EEL** → undefined behavior
+7. **Setting `wave_a=0` but forgetting `warp=0`** → warp still distorts everything
+
 ## Project Structure
 
 ```
