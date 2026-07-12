@@ -1,8 +1,8 @@
 [preset00]
 // PulsingColors Bars - Spectrum Analyzer
-// 32 vertical bars driven by bass/mid/treb with smooth interpolation
+// Based on proven classic MilkDrop spectrum patterns
 fRating=3.000000
-fGammaAdj=1.000000
+fGammaAdj=1.200000
 fVideoEchoZoom=1.000000
 fVideoEchoAngle=0.000000
 fWaveMode=0
@@ -16,9 +16,9 @@ bInterlace=false
 bBrighten=false
 bDarken=false
 bSolarize=false
-fWaveAlpha=0.000000
+fWaveAlpha=0.700000
 fWaveScale=1.000000
-fWaveSmoothing=0.300000
+fWaveSmoothing=0.500000
 fWaveAspect=1.000000
 fWarpAnimSpeed=1.000000
 fWarpScale=1.500000
@@ -48,60 +48,31 @@ wave_b=1.000000
 wave_a=0.000000
 wave_mode=0
 wave_scale=1.000000
-wave_smoothing=0.300000
+wave_smoothing=0.500000
 wave_mystery=0.000000
 wave_aspect=1.000000
-fDecay=0.000000
+fDecay=0.950000
 
-per_frame_1=wave_a = 0;
+per_frame_1=warp = 0;
+per_frame_2=wave_a = 0;
 
 wavecode_0_enabled=1
 wavecode_0_bSpectrum=1
-wavecode_0_samples=32
-wavecode_0_scaling=1.000000
-wavecode_0_smoothing=0.300000
+wavecode_0_samples=512
+wavecode_0_scaling=0.500000
+wavecode_0_smoothing=0.500000
 wavecode_0_sep=0
-wavecode_0_bUseDots=1
+wavecode_0_bUseDots=0
 wavecode_0_bDrawThick=1
 wavecode_0_bAdditive=0
-wavecode_0_r=0.0
-wavecode_0_g=0.0
-wavecode_0_b=0.0
-wavecode_0_a=0.0
+wavecode_0_r=1.0
+wavecode_0_g=1.0
+wavecode_0_b=1.0
+wavecode_0_a=0.8
 
 wave_0_per_point1=x = sample;
-wave_0_per_point2=y = 0.5;
-wave_0_per_point3=a = 0;
-
-comp_1=`shader_body
-comp_2=`{
-comp_3=`  float num_bars = 32.0;
-comp_4=`  float bar_idx = floor(uv.x * num_bars);
-comp_5=`  float bar_frac = fract(uv.x * num_bars);
-comp_6=`
-comp_7=`  float t = bar_idx / (num_bars - 1.0);
-comp_8=`
-comp_9=`  float b = bass_att;
-comp_10=`  float m = mid_att;
-comp_11=`  float tr = treb_att;
-comp_12=`
-comp_13=`  float b_w = max(1.0 - t * 3.0, 0.0);
-comp_14=`  float m_w = 1.0 - abs(t - 0.5) * 2.0;
-comp_15=`  float tr_w = max(t * 3.0 - 2.0, 0.0);
-comp_16=`  float w_sum = b_w + m_w + tr_w;
-comp_17=`  w_sum = max(w_sum, 0.001);
-comp_18=`  float level = (b * b_w + m * m_w + tr * tr_w) / w_sum;
-comp_19=`
-comp_20=`  float bar_top = 0.05 + level * 0.85;
-comp_21=`  float in_bar = step(0.05, uv.y) * step(uv.y, bar_top);
-comp_22=`
-comp_23=`  float edge = smoothstep(0.0, 0.1, bar_frac) * smoothstep(1.0, 0.9, bar_frac);
-comp_24=`
-comp_25=`  float hue = t * 6.2832 + time * 0.2;
-comp_26=`  float3 bar_col = float3(0.5 + 0.5*sin(hue), 0.5 + 0.5*sin(hue + 2.094), 0.5 + 0.5*sin(hue + 4.189));
-comp_27=`
-comp_28=`  float3 col = bar_col * in_bar * edge;
-comp_29=`  col += col * 0.3;
-comp_30=`
-comp_31=`  ret = col;
-comp_32=`}
+wave_0_per_point2=y = 0.5 - value1 * 10.0;
+wave_0_per_point3=hue = sample * 6.2832;
+wave_0_per_point4=r = 0.5 + 0.5*sin(hue);
+wave_0_per_point5=g = 0.5 + 0.5*sin(hue + 2.094);
+wave_0_per_point6=b = 0.5 + 0.5*sin(hue + 4.189);
