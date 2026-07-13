@@ -78,13 +78,13 @@ per_pixel_7=absy = abs(uy);
 per_pixel_8=maxv = max(absx, absy);
 per_pixel_9=minv = min(absx, absy);
 per_pixel_10=ratio = minv / max(maxv, 0.001);
-per_pixel_11=masked = 1.0 - step(sector_mask, ratio);
+per_pixel_11=masked = if(ratio < sector_mask, 1.0, 0.0);
 per_pixel_12=radial_b = dist2 / (radius*radius + 0.001);
-per_pixel_14=angle_mod = sin(ang*3.0 + angle_acc);
-per_pixel_15=bright = radial_b * angle_mod * masked * brightness;
-per_pixel_16=warp = bright * 0.03;
-per_pixel_17=dx = ux * warp;
-per_pixel_18=dy = uy * warp;
+per_pixel_13=angle_mod = sin(ang*3.0 + angle_acc);
+per_pixel_14=bright = radial_b * angle_mod * masked * brightness;
+per_pixel_15=warp = bright * 0.03;
+per_pixel_16=dx = ux * warp;
+per_pixel_17=dy = uy * warp;
 
 comp_1=`shader_body
 comp_2=`{

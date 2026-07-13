@@ -441,6 +441,8 @@ wave_0_per_point2=y = 0.5 - value1 * 10.0;
 9. **Numbering gaps in `comp_` lines** → parser stops at the gap, shader gets missing lines (closing `}`, trailing code). Keep sequential numbering for ALL prefixed lines.
 10. **per_pixel outward push (`dx = ux*...`, `dy = uy*...`) + fDecay < 1.0** → mesh drifts outward each frame, content fades — screen goes black after ~30 frames. Use angular/circular displacement instead (`dx = 0.003*sin(...)`, `dy = 0.003*cos(...)`).
 11. **smoothstep/radius clipping** — `smoothstep(r-0.05, r, dist2)` with `r=0.4` clips everything beyond 0.4 (most of the screen). Ensure radius covers the visible range.
+12. **`mid` is a built-in audio uniform in HLSL shaders** — declaring a local variable named `mid` in composite/warp shaders causes a compilation conflict with the pre-defined `mid` uniform (mid-range audio level). Rename to `mid_c` or similar.
+13. **`PSVERSION_WARP=2` without any warp shader lines** (`warp_N=\``...) causes "Error compiling composite warp shader code" — the parser expects a warp shader section but finds none. Remove `PSVERSION_WARP` if no custom warp shader is needed.
 
 ## Common WMP → MilkDrop Mapping
 

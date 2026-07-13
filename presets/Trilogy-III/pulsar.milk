@@ -1,0 +1,66 @@
+MILKDROP_PRESET_VERSION=201
+PSVERSION=2
+PSVERSION_COMP=2
+[preset00]
+fRating=3.000000
+fGammaAdj=1.000000
+fVideoEchoZoom=1.000000
+fVideoEchoAngle=0.000000
+fWaveMode=0
+bWaveThick=false
+bAdditiveWaves=false
+bWaveDarken=false
+bSmooth=true
+fWaveAlpha=0.000000
+fWaveScale=1.000000
+fWaveSmoothing=0.500000
+fWaveAspect=1.000000
+fWarpAnimSpeed=1.000000
+fWarpScale=1.500000
+fZoomExponent=1.000000
+fZoom=1.000000
+fSpin=0.000000
+fZoomCamera=0.000000
+dx=0.000000
+dy=0.000000
+cx=0.500000
+cy=0.500000
+sx=1.000000
+sy=1.000000
+ob_size=0.000000
+ob_r=0.000000
+ob_g=0.000000
+ob_b=0.000000
+ob_a=0.000000
+ib_size=0.000000
+ib_r=0.000000
+ib_g=0.000000
+ib_b=0.000000
+ib_a=0.000000
+wave_r=1.000000
+wave_g=1.000000
+wave_b=1.000000
+wave_a=0.000000
+wave_mode=0
+wave_scale=1.000000
+wave_smoothing=0.500000
+wave_mystery=0.000000
+wave_aspect=1.000000
+fDecay=0.950000
+
+per_frame_1=warp = 0;
+per_frame_2=wave_a = 0;
+
+comp_1=`shader_body
+comp_2=`{
+comp_3=`  float freq = uv.x;
+comp_4=`  float t = time * 0.3;
+comp_5=`  float h1 = 0.5 + 0.5*sin(freq*6.28 + t*1.0);
+comp_6=`  float h2 = 0.5 + 0.5*sin(freq*12.0 - t*1.5);
+comp_7=`  float h3 = 0.5 + 0.5*sin(freq*3.0 + t*0.7);
+comp_8=`  float h4 = 0.5 + 0.5*sin(freq*20.0 + t*2.0);
+comp_9=`  float peak = h1 * h2 * h3 * h4;
+comp_10=`  float dist = abs(uv.y - 0.5);
+comp_11=`  float g = peak * max(0.0, 1.0 - dist * 3.0);
+comp_12=`  ret = float3(0, g, 0);
+comp_13=`}
