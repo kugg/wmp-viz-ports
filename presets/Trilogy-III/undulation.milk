@@ -99,44 +99,35 @@ per_pixel_15=zoom = 0.97 + 0.03*wave_factor*radial_wave;
 // Composite shader: undulating waves with edge detection feel
 comp_1=`shader_body
 comp_2=`{
-comp_3=`  // Multi-directional wave scan (Manhattan distance transform feel)
-comp_4=`  float2 uv2 = uv - 0.5;
-comp_5=`  float ex = abs(uv2.x) * 2.0;
-comp_6=`  float ey = abs(uv2.y) * 2.0;
-comp_7=`  float edge_dist = max(ex, ey);
-comp_8=`
-comp_9=`  // Undulating waves from multiple directions
-comp_10=`  float wave_h = sin(uv.x * 12.0 - time * 1.5) * 0.5 + 0.5;
-comp_11=`  float wave_v = cos(uv.y * 10.0 + time * 1.2) * 0.5 + 0.5;
-comp_12=`  float wave_r = sin(length(uv2) * 15.0 - time * 1.0) * 0.5 + 0.5;
+comp_3=`  float2 uv2 = uv - 0.5;
+comp_4=`  float ex = abs(uv2.x) * 2.0;
+comp_5=`  float ey = abs(uv2.y) * 2.0;
+comp_6=`  float edge_dist = max(ex, ey);
+comp_7=`
+comp_8=`  float wave_h = sin(uv.x * 12.0 - time * 1.5) * 0.5 + 0.5;
+comp_9=`  float wave_v = cos(uv.y * 10.0 + time * 1.2) * 0.5 + 0.5;
+comp_10=`  float wave_r = sin(length(uv2) * 15.0 - time * 1.0) * 0.5 + 0.5;
+comp_11=`
+comp_12=`  float undulation = wave_h * 0.4 + wave_v * 0.4 + wave_r * 0.2;
 comp_13=`
-comp_14=`  // Combine wave directions
-comp_15=`  float undulation = wave_h * 0.4 + wave_v * 0.4 + wave_r * 0.2;
-comp_16=`
-comp_17=`  // Edge detection effect: bright at edges, dark in center
-comp_18=`  float edge = smoothstep(0.0, 0.5, edge_dist) * (1.0 - smoothstep(0.5, 1.0, edge_dist));
-comp_19=`
-comp_20=`  // Audio-reactive intensity
-comp_21=`  float intensity = 0.5 + 0.5 * tex2D(sampler_fc_main, uv).a;
+comp_14=`  float edge = smoothstep(0.0, 0.5, edge_dist) * (1.0 - smoothstep(0.5, 1.0, edge_dist));
+comp_15=`
+comp_16=`  float intensity = 0.5 + 0.5 * tex2D(sampler_fc_main, uv).a;
+comp_17=`
+comp_18=`  float3 deep = float3(0.05, 0.1, 0.3);
+comp_19=`  float3 mid = float3(0.1, 0.3, 0.6);
+comp_20=`  float3 bright = float3(0.4, 0.7, 1.0);
+comp_21=`  float3 white = float3(0.9, 0.95, 1.0);
 comp_22=`
-comp_23=`  // Color: cool blues with white edges
-comp_24=`  float3 deep = float3(0.05, 0.1, 0.3);
-comp_25=`  float3 mid = float3(0.1, 0.3, 0.6);
-comp_26=`  float3 bright = float3(0.4, 0.7, 1.0);
-comp_27=`  float3 white = float3(0.9, 0.95, 1.0);
-comp_28=`
-comp_29=`  // Gradient based on undulation
-comp_30=`  float3 col;
-comp_31=`  if (undulation < 0.33) col = lerp(deep, mid, undulation / 0.33);
-comp_32=`  else if (undulation < 0.66) col = lerp(mid, bright, (undulation - 0.33) / 0.33);
-comp_33=`  else col = lerp(bright, white, (undulation - 0.66) / 0.34);
-comp_34=`
-comp_35=`  // Edge highlight
-comp_36=`  col += edge * float3(0.2, 0.3, 0.5) * (0.5 + 0.5*sin(time));
-comp_37=`
-comp_38=`  // Fade at edges
-comp_39=`  float fade = 1.0 - smoothstep(0.6, 1.0, length(uv2));
-comp_40=`  col *= fade;
+comp_23=`  float3 col;
+comp_24=`  if (undulation < 0.33) col = lerp(deep, mid, undulation / 0.33);
+comp_25=`  else if (undulation < 0.66) col = lerp(mid, bright, (undulation - 0.33) / 0.33);
+comp_26=`  else col = lerp(bright, white, (undulation - 0.66) / 0.34);
+comp_27=`
+comp_28=`  col += edge * float3(0.2, 0.3, 0.5) * (0.5 + 0.5*sin(time));
+comp_29=`
+comp_30=`  float fade = 1.0 - smoothstep(0.6, 1.0, length(uv2));
+comp_31=`  col *= fade;
 comp_41=`
 comp_42=`  ret = col;
 comp_43=`}

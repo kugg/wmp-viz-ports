@@ -234,7 +234,9 @@ fmod(a, b)            →  avoid entirely in per-pixel (no floor available)
 - Per-pixel/per-frame lines must be sequentially numbered: `per_pixel_1=`, `per_pixel_2=`, etc.
 - Gaps in numbering terminate the parser — never skip numbers
 - Comment-only lines (`per_pixel_5=// comment`) occupy a line number
-- Composite shader lines use backtick (`` ` ``) for continuation: `` comp_1=`shader_body ``
+- **NEVER use `//` or `/* */` comments inside backtick-continued shader lines** (`comp_N=\``, `warp_N=\``). The `.milk` parser strips `//` comments at the line level before the HLSL compiler sees them, corrupting the code. The shader falls back to the default passthrough silently with a single WARN log line.
+  - ✅ `comp_1=\`  ret = tex2D(sampler_main, uv).xyz;`
+  - ❌ `comp_1=\`  // read texture\n  ret = tex2D(sampler_main, uv).xyz;`
 
 ## Step 8: Write the Preset
 
@@ -411,6 +413,7 @@ wave_0_per_point2=y = 0.5 - value1 * 10.0;
 5. **Using `if/else` blocks in per-point EEL** → fails silently
 6. **Using `floor()`, `fract()`, `step()` in per-point EEL** → undefined behavior
 7. **Setting `wave_a=0` but forgetting `warp=0`** → warp still distorts everything
+8. **`//` comments in backtick shader lines** → the `.milk` parser strips `//` at the line level, corrupting the HLSL code. The shader falls back silently to passthrough (`tex2D(sampler_main, uv)`). Remove ALL comments from backtick-continued lines.
 
 ## Common WMP → MilkDrop Mapping
 

@@ -70,30 +70,25 @@ comp_3=`  float2 uv2 = uv - 0.5;
 comp_4=`  float dist = length(uv2);
 comp_5=`  float angle = atan2(uv2.y, uv2.x);
 comp_6=`
-comp_7=`  // Cloud density from layered sine waves
-comp_8=`  float n1 = 0.5 + 0.5*sin(dist*8.0 - time*0.5 + angle*2.0);
-comp_9=`  float n2 = 0.5 + 0.5*sin(dist*12.0 + time*0.3 - angle*3.0);
-comp_10=`  float n3 = 0.5 + 0.5*sin(dist*5.0 - time*0.7 + angle*1.5);
-comp_11=`  float cloud = n1 * 0.5 + n2 * 0.3 + n3 * 0.2;
-comp_12=`
-comp_13=`  // Channel rotation: RGB channels shift based on time + audio
-comp_14=`  float ca = time * 0.25 + bass * 0.3;
-comp_15=`  float3 col;
-comp_16=`  col.r = cloud * (0.3 + 0.3*sin(ca));
-comp_17=`  col.g = cloud * (0.4 + 0.2*sin(ca + 2.0944));
-comp_18=`  col.b = cloud * (0.6 + 0.3*sin(ca + 4.1888));
-comp_19=`
-comp_20=`  // Radial fade
-comp_21=`  float fade = 1.0 - saturate(dist * 1.3);
-comp_22=`  col *= fade;
+comp_7=`  float n1 = 0.5 + 0.5*sin(dist*8.0 - time*0.5 + angle*2.0);
+comp_8=`  float n2 = 0.5 + 0.5*sin(dist*12.0 + time*0.3 - angle*3.0);
+comp_9=`  float n3 = 0.5 + 0.5*sin(dist*5.0 - time*0.7 + angle*1.5);
+comp_10=`  float cloud = n1 * 0.5 + n2 * 0.3 + n3 * 0.2;
+comp_11=`
+comp_12=`  float ca = time * 0.25 + bass * 0.3;
+comp_13=`  float3 col;
+comp_14=`  col.r = cloud * (0.3 + 0.3*sin(ca));
+comp_15=`  col.g = cloud * (0.4 + 0.2*sin(ca + 2.0944));
+comp_16=`  col.b = cloud * (0.6 + 0.3*sin(ca + 4.1888));
+comp_17=`
+comp_18=`  float fade = 1.0 - saturate(dist * 1.3);
+comp_19=`  col *= fade;
+comp_20=`
+comp_21=`  float glow = pow(cloud, 2.5) * 1.5;
+comp_22=`  col += glow * float3(0.2, 0.1, 0.4);
 comp_23=`
-comp_24=`  // Additive glow
-comp_25=`  float glow = pow(cloud, 2.5) * 1.5;
-comp_26=`  col += glow * float3(0.2, 0.1, 0.4);
-comp_27=`
-comp_28=`  // Soft white core
-comp_29=`  float core = pow(max(0, 1.0 - dist*2.5), 2.0);
-comp_30=`  col += core * 0.15 * float3(1.0, 0.95, 0.9);
-comp_31=`
-comp_32=`  ret = col;
-comp_33=`}
+comp_24=`  float core = pow(max(0, 1.0 - dist*2.5), 2.0);
+comp_25=`  col += core * 0.15 * float3(1.0, 0.95, 0.9);
+comp_26=`
+comp_27=`  ret = col;
+comp_28=`}
