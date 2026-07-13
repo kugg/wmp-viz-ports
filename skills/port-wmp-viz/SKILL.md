@@ -238,13 +238,30 @@ fmod(a, b)            →  avoid entirely in per-pixel (no floor available)
   - ✅ `comp_1=\`  ret = tex2D(sampler_main, uv).xyz;`
   - ❌ `comp_1=\`  // read texture\n  ret = tex2D(sampler_main, uv).xyz;`
 
+### HLSL → GLSL Transpiler Limitations
+
+The ProjectM HLSL transpiler (M4::HLSLParser) has quirks that can cause silent compilation failures:
+
+- **No variables inside `sin()`/`cos()` arguments**: Using previously-defined local variables in trig functions will fail. `sin(t*speed)` = ❌, `sin(time*0.6*(0.8 + 0.6*bass))` = ✅. Decompose to `sin(time*CONSTANT + bass*time*CONSTANT)` pattern.
+- **Avoid `sqrt()` and `pow()` with non-integer exponents**: Prefer literal multiplication: `lava*lava*lava` instead of `pow(lava, 3.0)`. `sqrt()` can cause NaN propagation issues.
+- **`atan2` creates visible seam**: Using `atan2(y, x)` for polar coordinates creates a visible discontinuity at the left edge (angle wraps from π to -π). Use cartesian coordinates (`uv2.x`, `uv2.y`) instead.
+- **`treb_att` is the correct name**: NOT `treble_att`. The attenuated treble uniform is `treb_att`.
+
+Safe trig pattern:
+```hlsl
+float p1 = 0.5 + 0.5*sin(uv2.x*12.0 + uv2.y*10.0 - time*0.5 + bass*time*0.3);
+float p2 = 0.5 + 0.5*sin(uv2.x*8.0 - uv2.y*14.0 + time*0.6 + mid*time*0.2);
+```
+
 ## Step 8: Write the Preset
 
 ### Approach
 
 1. **Start with composite shader** — get the visual effect right in HLSL first (full language support)
 2. **Extract to per-frame/per-pixel** — move what can be expressed in EEL for performance
-3. **Add audio reactivity** — use `bass_att`/`mid_att`/`treble_att` for smooth response
+3. **Add audio reactivity** — use `bass_att`/`mid_att`/`treb_att` for smooth response (attenuated/averaged). These are available as built-in uniforms in composite/warp shaders — no per_frame q-variables needed.
+   - Raw peaks: `bass`, `mid`, `treb` (instantaneous, can strobe)
+   - Smoothed: `bass_att`, `mid_att`, `treb_att` (smooth, use for color modulation)
 4. **Test iteratively** — validate syntax, then test visually
 
 ### Minimum Viable Preset
