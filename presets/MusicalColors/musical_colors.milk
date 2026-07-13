@@ -68,7 +68,7 @@ per_frame_6=q2 = 0.5 + 0.5*sin(t*0.2);
 per_frame_7=q3 = 0.5 + 0.5*sin(t*0.2 + 2.0944);
 per_frame_8=q4 = 0.5 + 0.5*sin(t*0.2 + 4.1888);
 per_frame_9=q5 = 0.1 + 0.1*bass;
-per_frame_10=q6 = 0.4 + 0.1*treb;
+per_frame_10=q6 = 0.8 + 0.15*treb;
 per_frame_11=zoom = 1.0 - 0.02*bass;
 per_frame_12=dx = scroll_x;
 per_frame_13=dy = scroll_y;
@@ -101,4 +101,4 @@ comp_25=`  float glow = exp(-dist2*3.0) * 0.15;
 comp_26=`  col += glow * palette;
 comp_27=`
 comp_28=`  ret = col;
-comp_35=`}
+comp_29=`}
