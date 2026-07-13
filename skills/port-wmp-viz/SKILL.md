@@ -222,6 +222,15 @@ fmod(a, b)            →  avoid entirely in per-pixel (no floor available)
 ```
 
 **Critical formatting rules**:
+- **MUST set version headers BEFORE `[preset00]`** or composite shaders are completely ignored:
+  ```
+  MILKDROP_PRESET_VERSION=201
+  PSVERSION=2
+  PSVERSION_WARP=2
+  PSVERSION_COMP=2
+  [preset00]
+  ```
+- Without these, ProjectM defaults to MilkDrop 1.x (presetVersion=100) which has no shader support — presets render as black
 - Per-pixel/per-frame lines must be sequentially numbered: `per_pixel_1=`, `per_pixel_2=`, etc.
 - Gaps in numbering terminate the parser — never skip numbers
 - Comment-only lines (`per_pixel_5=// comment`) occupy a line number

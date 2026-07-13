@@ -119,6 +119,14 @@ Confirmed working preset
 ```
 
 ### 6. Known Quirks
+- **MUST set version headers** before `[preset00]` or composite shaders are completely ignored:
+  ```
+  MILKDROP_PRESET_VERSION=201
+  PSVERSION=2
+  PSVERSION_WARP=2
+  PSVERSION_COMP=2
+  ```
+  Without these, ProjectM defaults to MilkDrop 1.x (presetVersion=100) which has no shader support — presets render as black
 - `.milk` parser terminates at numbering gaps — always use sequential numbering (`per_frame_1`, `per_frame_2`, ...)
 - Composite shader lines use backtick (`` ` ``) line continuation: `` comp_1=`shader_body ``
 - Comment lines (`per_pixel_5=// comment`) are valid but occupy a line number — avoid duplicate numbering
