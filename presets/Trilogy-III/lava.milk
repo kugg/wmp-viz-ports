@@ -71,13 +71,10 @@ per_pixel_2=uy = y - 0.5;
 per_pixel_3=dist = sqrt(ux*ux + uy*uy);
 per_pixel_4=angle = atan2(uy, ux);
 per_pixel_5=flow = 0.5 + 0.5*sin(angle*3.0 + dist*8.0 - time*2.0);
-per_pixel_6=falloff = 1.0 - dist*1.2;
-per_pixel_7=falloff = max(falloff, 0.0);
-per_pixel_8=zoom = 0.95 + 0.05*flow*falloff;
-per_pixel_9=sdx = ux*flow*0.03;
-per_pixel_10=sdy = uy*flow*0.03;
-per_pixel_11=dx = sdx;
-per_pixel_12=dy = sdy;
+per_pixel_6=sdx = ux*flow*0.02;
+per_pixel_7=sdy = uy*flow*0.02;
+per_pixel_8=dx = sdx;
+per_pixel_9=dy = sdy;
 
 comp_1=`shader_body
 comp_2=`{
@@ -98,37 +95,31 @@ comp_16=`
 comp_17=`  float lava = flow * rings;
 comp_18=`  lava = lava * 0.7 + turbulence * 0.3;
 comp_19=`
-comp_20=`  // Radial falloff - hot center, cool edges
-comp_21=`  float falloff = 1.0 - saturate(dist * 1.5);
+comp_20=`  // Slight radial falloff
+comp_21=`  float falloff = 1.0 - saturate(dist * 2.0) * 0.4;
 comp_22=`  lava *= falloff;
 comp_23=`
-comp_24=`  // Lava color palette: dark red -> orange -> yellow -> white
-comp_25=`  float3 cold = float3(0.1, 0.0, 0.0);
-comp_26=`  float3 warm = float3(0.8, 0.2, 0.0);
-comp_27=`  float3 hot = float3(1.0, 0.6, 0.0);
-comp_28=`  float3 white = float3(1.0, 0.9, 0.7);
+comp_24=`  // Lava color palette: red -> orange -> yellow -> bright white
+comp_25=`  float3 cold = float3(0.3, 0.05, 0.0);
+comp_26=`  float3 warm = float3(0.9, 0.35, 0.05);
+comp_27=`  float3 hot = float3(1.0, 0.7, 0.1);
+comp_28=`  float3 white = float3(1.0, 0.95, 0.8);
 comp_29=`
-comp_30=`  // Audio-reactive color shift: bass makes it hotter
-comp_31=`  float t2 = lava * bass;
-comp_32=`
-comp_33=`  // 4-stop gradient
-comp_34=`  float3 col;
-comp_35=`  if (t2 < 0.33) col = lerp(cold, warm, t2 / 0.33);
-comp_36=`  else if (t2 < 0.66) col = lerp(warm, hot, (t2 - 0.33) / 0.33);
-comp_37=`  else col = lerp(hot, white, (t2 - 0.66) / 0.34);
-comp_38=`
-comp_39=`  // Glow pulses with bass
-comp_40=`  float glow = pow(lava, 3.0) * 2.0 * bass;
-comp_41=`  col += glow * float3(1.0, 0.5, 0.1);
-comp_42=`
-comp_43=`  // Dark veins: mid drives vein speed
-comp_44=`  float veins = 0.5 + 0.5*sin(angle*7.0 + dist*30.0 + time*0.5*mid);
-comp_45=`  veins = smoothstep(0.3, 0.7, veins);
-comp_46=`  col *= 0.5 + 0.5*veins;
-comp_47=`
-comp_48=`  // Bright eruption bursts on bass hits
-comp_49=`  float burst = pow(max(0, 1.0 - dist*2.5), 2.0) * bass * 0.4;
-comp_50=`  col += burst * float3(1.0, 0.7, 0.2);
-comp_51=`
-comp_52=`  ret = col;
-comp_53=`}
+comp_30=`  float t2 = lava * bass;
+comp_31=`
+comp_32=`  // 4-stop gradient
+comp_33=`  float3 col;
+comp_34=`  if (t2 < 0.33) col = lerp(cold, warm, t2 / 0.33);
+comp_35=`  else if (t2 < 0.66) col = lerp(warm, hot, (t2 - 0.33) / 0.33);
+comp_36=`  else col = lerp(hot, white, (t2 - 0.66) / 0.34);
+comp_37=`
+comp_38=`  // Glow pulses with bass
+comp_39=`  float glow = pow(lava, 2.0) * 1.5 * bass;
+comp_40=`  col += glow * float3(1.0, 0.5, 0.1);
+comp_41=`
+comp_42=`  // Bright eruption bursts on bass hits
+comp_43=`  float burst = pow(max(0, 1.0 - dist*2.5), 2.0) * bass * 0.5;
+comp_44=`  col += burst * float3(1.0, 0.7, 0.2);
+comp_45=`
+comp_46=`  ret = col;
+comp_47=`}
