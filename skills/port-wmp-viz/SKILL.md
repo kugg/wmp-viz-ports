@@ -232,7 +232,7 @@ fmod(a, b)            →  avoid entirely in per-pixel (no floor available)
   ```
 - Without these, ProjectM defaults to MilkDrop 1.x (presetVersion=100) which has no shader support — presets render as black
 - Per-pixel/per-frame lines must be sequentially numbered: `per_pixel_1=`, `per_pixel_2=`, etc.
-- Gaps in numbering terminate the parser — never skip numbers
+- **Same rule applies to `comp_` and `warp_` lines**: gaps in numbering terminate the parser — `comp_28` followed by `comp_35` means lines 29-34 are lost and the shader will have syntax errors (missing closing `}`, etc.)
 - Comment-only lines (`per_pixel_5=// comment`) occupy a line number
 - **NEVER use `//` or `/* */` comments inside backtick-continued shader lines** (`comp_N=\``, `warp_N=\``). The `.milk` parser strips `//` comments at the line level before the HLSL compiler sees them, corrupting the code. The shader falls back to the default passthrough silently with a single WARN log line.
   - ✅ `comp_1=\`  ret = tex2D(sampler_main, uv).xyz;`
@@ -382,6 +382,13 @@ Frame N:
 
 **Key insight**: Composite output feeds back through warp next frame. With `fDecay=1.0`, this causes infinite accumulation ("lava" effect). With `fDecay=0.0`, nothing persists (black screen).
 
+**Critical pipeline nuance**: The user sees the WARP output (currentFrameBuffer), NOT the composite output directly. The composite writes to the previous frame buffer, which becomes the warp's input next frame. So the visual is always one frame delayed through warp + fDecay:
+- Composite generates fresh content → stored as "previous frame"
+- Next frame: warp reads it, applies fDecay + mesh distortion → displayed
+- So the user sees a faded+distorted version of what the composite produced last frame
+  
+If per_pixel equations push vertices outward (dx = ux*...), the warp displaces content outward each frame. Combined with fDecay < 1.0, content fades while drifting outward → eventual black screen after ~30 frames.
+
 ### Spectrum Analyzer Pattern
 
 ProjectM's FFT equalization suppresses low frequencies heavily (DC=0, bass≈0.00004, treble≈0.125). The `value1` variable in custom waveforms is **not** raw FFT magnitude — it's equalized and scaled.
@@ -414,6 +421,9 @@ wave_0_per_point2=y = 0.5 - value1 * 10.0;
 6. **Using `floor()`, `fract()`, `step()` in per-point EEL** → undefined behavior
 7. **Setting `wave_a=0` but forgetting `warp=0`** → warp still distorts everything
 8. **`//` comments in backtick shader lines** → the `.milk` parser strips `//` at the line level, corrupting the HLSL code. The shader falls back silently to passthrough (`tex2D(sampler_main, uv)`). Remove ALL comments from backtick-continued lines.
+9. **Numbering gaps in `comp_` lines** → parser stops at the gap, shader gets missing lines (closing `}`, trailing code). Keep sequential numbering for ALL prefixed lines.
+10. **per_pixel outward push (`dx = ux*...`, `dy = uy*...`) + fDecay < 1.0** → mesh drifts outward each frame, content fades — screen goes black after ~30 frames. Use angular/circular displacement instead (`dx = 0.003*sin(...)`, `dy = 0.003*cos(...)`).
+11. **smoothstep/radius clipping** — `smoothstep(r-0.05, r, dist2)` with `r=0.4` clips everything beyond 0.4 (most of the screen). Ensure radius covers the visible range.
 
 ## Common WMP → MilkDrop Mapping
 
