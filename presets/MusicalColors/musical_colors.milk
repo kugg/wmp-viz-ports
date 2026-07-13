@@ -2,7 +2,7 @@
 // Musical Colors
 // Ported from WMP wmpvis.dll
 // Original: FUN_590d8b13 - Per-pixel polar rendering with barrel distortion
-// Algorithm: polar coords -> barrel distortion -> color interpolation -> scroll
+// Flowing field of colored light with barrel distortion and spiral ripples
 fRating=3.000000
 fGammaAdj=1.000000
 fVideoEchoZoom=1.000000
@@ -55,43 +55,20 @@ wave_mystery=0.000000
 wave_aspect=1.000000
 fDecay=0.960000
 
-// Per-frame: scroll, barrel, color cycling, audio-reactive parameters
 per_frame_1=t = time*0.3;
-per_frame_2=// Scroll speed: original uses velocity from audio (offset 0x10dd)
-per_frame_3=scroll_x = 0.003*sin(t*0.7) + 0.002*bass;
-per_frame_4=scroll_y = 0.003*cos(t*0.5) + 0.002*mid;
-per_frame_5=// Barrel distortion factor (original offset 0x2b per shape)
-per_frame_6=q1 = 0.1 + 0.05*sin(t*0.4);
-per_frame_7=// Color cycling: target RGB from sine table modulation
-per_frame_8=q2 = 0.5 + 0.5*sin(t*0.2);
-per_frame_9=q3 = 0.5 + 0.5*sin(t*0.2 + 2.0944);
-per_frame_10=q4 = 0.5 + 0.5*sin(t*0.2 + 4.1888);
-per_frame_11=// Color interpolation factor (original offset 0x11ca)
-per_frame_12=q5 = 0.1 + 0.1*bass;
-per_frame_13=// Radius for clipping (original offset 0x22 per shape)
-per_frame_14=q6 = 0.4 + 0.1*treb;
-per_frame_15=// Zoom breathing
-per_frame_16=zoom = 1.0 - 0.02*bass;
-per_frame_17=dx = scroll_x;
-per_frame_18=dy = scroll_y;
+per_frame_2=scroll_x = 0.003*sin(t*0.7) + 0.002*bass;
+per_frame_3=scroll_y = 0.003*cos(t*0.5) + 0.002*mid;
+per_frame_4=barrel = 0.1 + 0.05*sin(t*0.4);
+per_frame_5=q1 = barrel;
+per_frame_6=q2 = 0.5 + 0.5*sin(t*0.2);
+per_frame_7=q3 = 0.5 + 0.5*sin(t*0.2 + 2.0944);
+per_frame_8=q4 = 0.5 + 0.5*sin(t*0.2 + 4.1888);
+per_frame_9=q5 = 0.1 + 0.1*bass;
+per_frame_10=q6 = 0.4 + 0.1*treb;
+per_frame_11=zoom = 1.0 - 0.02*bass;
+per_frame_12=dx = scroll_x;
+per_frame_13=dy = scroll_y;
 
-// Per-pixel: polar coordinates with barrel distortion
-per_pixel_1=ux = x - 0.5;
-per_pixel_2=uy = y - 0.5;
-per_pixel_3=dist = sqrt(ux*ux + uy*uy);
-per_pixel_4=ang = atan2(uy, ux);
-per_pixel_5=// Barrel distortion (original FUN_590d8b13 lines 3620-3650)
-per_pixel_6=barrel = q1 * dist;
-per_pixel_7=ux2 = ux * (1.0 + barrel);
-per_pixel_8=uy2 = uy * (1.0 + barrel);
-per_pixel_9=dist2 = sqrt(ux2*ux2 + uy2*uy2);
-per_pixel_10=// Clip to shape radius
-per_pixel_11=mask = 1.0 - min(max((dist2 - q6)*10.0, 0.0), 1.0);
-per_pixel_12=// Color interpolation based on distance (original: dist * colorMod / radius)
-per_pixel_13=color_factor = dist2 * q5;
-per_pixel_14=color_factor = min(max(color_factor, 0.0), 1.0);
-
-// Composite shader: color interpolation with barrel distortion
 comp_1=`shader_body
 comp_2=`{
 comp_3=`  float2 uv2 = uv - 0.5;
@@ -107,28 +84,23 @@ comp_12=`  // Clip to shape radius
 comp_13=`  float radius = q6;
 comp_14=`  float mask = 1.0 - smoothstep(radius - 0.05, radius, dist2);
 comp_15=`
-comp_16=`  // Target colors from per-frame (sine table modulation)
-comp_17=`  float3 target = float3(q2, q3, q4);
-comp_18=`
-comp_19=`  // Read previous frame
-comp_20=`  float3 prev = tex2D(sampler_main, uv).rgb;
-comp_21=`
-comp_22=`  // Color interpolation (original: channel += (target - channel) * factor)
-comp_23=`  float color_factor = dist2 * q5;
-comp_24=`  color_factor = min(max(color_factor, 0.0), 1.0);
-comp_25=`  float3 col = prev + (target - prev) * color_factor;
+comp_16=`  // Palette color from angle and time
+comp_17=`  float hue = time*0.15 + dist2*3.0 + angle*0.5;
+comp_18=`  float3 palette;
+comp_19=`  palette.r = 0.5 + 0.5*sin(hue);
+comp_20=`  palette.g = 0.5 + 0.5*sin(hue + 2.094);
+comp_21=`  palette.b = 0.5 + 0.5*sin(hue + 4.189);
+comp_22=`
+comp_23=`  // Spiral ripple
+comp_24=`  float spiral = sin(dist2*20.0 - time*1.0 + angle*2.0);
+comp_25=`  spiral = 0.5 + 0.5*spiral;
 comp_26=`
-comp_27=`  // Apply mask
-comp_28=`  col *= mask;
+comp_27=`  // Combine
+comp_28=`  float3 col = palette * spiral * mask;
 comp_29=`
-comp_30=`  // Scroll effect: offset UV based on angle
-comp_31=`  float scroll = sin(angle*2.0 + time*0.5) * 0.02;
-comp_32=`  float3 scrolled = tex2D(sampler_main, uv + float2(scroll, scroll*0.5)).rgb;
-comp_33=`  col = lerp(col, scrolled, 0.3);
-comp_34=`
-comp_35=`  // Soft radial glow
-comp_36=`  float glow = exp(-dist2*3.0) * 0.15;
-comp_37=`  col += glow * target;
-comp_38=`
-comp_39=`  ret = col;
-comp_40=`}
+comp_30=`  // Soft radial glow
+comp_31=`  float glow = exp(-dist2*3.0) * 0.15;
+comp_32=`  col += glow * palette;
+comp_33=`
+comp_34=`  ret = col;
+comp_35=`}

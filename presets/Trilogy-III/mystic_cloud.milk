@@ -1,8 +1,8 @@
 [preset00]
 // Trilogy III - Mystic Cloud
 // Ported from WMP Visualization by Averett & Associates (2001)
-// Original: FUN_10005f50 - Per-pixel RGB channel rotation with audio-reactive easing
-// Algorithm: extract RGB -> rotate channels by angle -> sin scaling -> ease toward target
+// Original: FUN_10005f50 - Per-pixel RGB channel rotation
+// Cloud-like ethereal color field with channel rotation and audio reactivity
 fRating=3.000000
 fGammaAdj=1.000000
 fVideoEchoZoom=1.000000
@@ -55,70 +55,41 @@ wave_mystery=0.000000
 wave_aspect=1.000000
 fDecay=0.960000
 
-// Per-frame: rotation angle, target colors, easing factor
 per_frame_1=t = time*0.15;
-per_frame_2=// Rotation angle cycles 0-90 degrees (use sin/cos to avoid floor())
-per_frame_3=angle = time*15.0;
-per_frame_4=sin_angle = 0.3 + 0.7*abs(sin(angle*0.017453));
-per_frame_5=// Target colors: slowly shifting teal -> purple -> blue
-per_frame_6=q1 = 0.4 + 0.3*sin(t*0.2);
-per_frame_7=q2 = 0.3 + 0.2*sin(t*0.2 + 2.0944);
-per_frame_8=q3 = 0.5 + 0.3*sin(t*0.2 + 4.1888);
-per_frame_9=// Easing factor: audio-reactive (original uses sin_table[angle])
-per_frame_10=q4 = 0.05 + 0.1*bass;
-per_frame_11=// Cloud drift
-per_frame_12=dx = 0.002*sin(t*0.7);
-per_frame_13=dy = 0.002*cos(t*0.5);
-per_frame_14=// Warp scale pulses with music for cloud movement
-per_frame_15=fWarpScale = 1.5 + 0.3*bass;
+per_frame_2=dx = 0.002*sin(t*0.7);
+per_frame_3=dy = 0.002*cos(t*0.5);
+per_frame_4=fWarpScale = 1.5 + 0.3*bass;
 
-// Per-pixel: subtle radial distortion for cloud feel
-per_pixel_1=dist = sqrt((x-0.5)*(x-0.5) + (y-0.5)*(y-0.5));
-per_pixel_2=zoom = 0.98 + 0.04*dist;
-
-// Composite shader: RGB channel rotation (the core of Mystic Cloud)
 comp_1=`shader_body
 comp_2=`{
-comp_3=`  // Read previous frame (after warp)
-comp_4=`  float3 prev = tex2D(sampler_main, uv).rgb;
-comp_5=`
-comp_6=`  // Original algorithm: channel permutation based on rotation angle
-comp_7=`  // 0-59: RGB order, 60-119: swap R<->G, 120-179: swap R<->B
-comp_8=`  float angle_rad = time * 0.25;
-comp_9=`  float angle_deg = fmod(angle_rad * 57.2958, 180.0);
-comp_10=`
-comp_11=`  float3 rotated;
-comp_12=`  if (angle_deg < 60.0) {
-comp_13=`    // RGB order
-comp_14=`    rotated = prev;
-comp_15=`  } else if (angle_deg < 120.0) {
-comp_16=`    // Swap R<->G
-comp_17=`    rotated = float3(prev.g, prev.r, prev.b);
-comp_18=`  } else {
-comp_19=`    // Swap R<->B
-comp_20=`    rotated = float3(prev.b, prev.g, prev.r);
-comp_21=`  }
-comp_22=`
-comp_23=`  // Sinusoidal scaling (original: channel *= sin_table[angle])
-comp_24=`  float sin_scale = 0.3 + 0.7*abs(sin(angle_rad));
-comp_25=`  rotated *= sin_scale;
-comp_26=`
-comp_27=`  // Target colors from per-frame (passed via q-variables)
-comp_28=`  float3 target = float3(q1, q2, q3);
-comp_29=`
-comp_30=`  // Easing toward target (original: channel += (target - channel) * easing)
-comp_31=`  float ease = q4;
-comp_32=`  float3 col = rotated + (target - rotated) * ease;
-comp_33=`
-comp_34=`  // Radial fade for cloud density
-comp_35=`  float2 uv2 = uv - 0.5;
-comp_36=`  float dist = length(uv2);
-comp_37=`  float fade = 1.0 - saturate(dist * 1.4);
-comp_38=`  col *= fade;
-comp_39=`
-comp_40=`  // Additive glow at bright spots
-comp_41=`  float glow = pow(max(0, 1.0 - dist*2.0), 2.0) * 0.15;
-comp_42=`  col += glow * target;
-comp_43=`
-comp_44=`  ret = col;
-comp_45=`}
+comp_3=`  float2 uv2 = uv - 0.5;
+comp_4=`  float dist = length(uv2);
+comp_5=`  float angle = atan2(uv2.y, uv2.x);
+comp_6=`
+comp_7=`  // Cloud density from layered sine waves
+comp_8=`  float n1 = 0.5 + 0.5*sin(dist*8.0 - time*0.5 + angle*2.0);
+comp_9=`  float n2 = 0.5 + 0.5*sin(dist*12.0 + time*0.3 - angle*3.0);
+comp_10=`  float n3 = 0.5 + 0.5*sin(dist*5.0 - time*0.7 + angle*1.5);
+comp_11=`  float cloud = n1 * 0.5 + n2 * 0.3 + n3 * 0.2;
+comp_12=`
+comp_13=`  // Channel rotation: RGB channels shift based on time + audio
+comp_14=`  float ca = time * 0.25 + bass * 0.3;
+comp_15=`  float3 col;
+comp_16=`  col.r = cloud * (0.3 + 0.3*sin(ca));
+comp_17=`  col.g = cloud * (0.4 + 0.2*sin(ca + 2.0944));
+comp_18=`  col.b = cloud * (0.6 + 0.3*sin(ca + 4.1888));
+comp_19=`
+comp_20=`  // Radial fade
+comp_21=`  float fade = 1.0 - saturate(dist * 1.3);
+comp_22=`  col *= fade;
+comp_23=`
+comp_24=`  // Additive glow
+comp_25=`  float glow = pow(cloud, 2.5) * 1.5;
+comp_26=`  col += glow * float3(0.2, 0.1, 0.4);
+comp_27=`
+comp_28=`  // Soft white core
+comp_29=`  float core = pow(max(0, 1.0 - dist*2.5), 2.0);
+comp_30=`  col += core * 0.15 * float3(1.0, 0.95, 0.9);
+comp_31=`
+comp_32=`  ret = col;
+comp_33=`}
