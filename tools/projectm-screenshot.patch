@@ -1,0 +1,509 @@
+diff --git a/src/api/include/projectM-4/debug.h b/src/api/include/projectM-4/debug.h
+index 32ff875f6..462a14f92 100644
+--- a/src/api/include/projectM-4/debug.h
++++ b/src/api/include/projectM-4/debug.h
+@@ -52,6 +52,21 @@ extern "C" {
+  */
+ PROJECTM_EXPORT void projectm_write_debug_image_on_next_frame(projectm_handle instance, const char* output_file);
+ 
++/**
++ * @brief Captures the currently bound framebuffer and writes it to a BMP file.
++ *
++ * Call this function after projectm_opengl_render_frame() to capture the final
++ * rendered output, including composite shader effects and sprites.
++ *
++ * If @a output_file is NULL or empty, an auto-generated filename will be used
++ * in the current working directory with the format "projectm-screenshot-<timestamp>.bmp".
++ *
++ * @param instance The projectM instance handle.
++ * @param output_file The filename to write the screenshot to, or NULL for auto-generated.
++ * @since 4.3.0
++ */
++PROJECTM_EXPORT void projectm_take_screenshot(projectm_handle instance, const char* output_file);
++
+ #ifdef __cplusplus
+ } // extern "C"
+ #endif
+diff --git a/src/libprojectM/ProjectM.cpp b/src/libprojectM/ProjectM.cpp
+index a042f244c..f4aa09eb2 100644
+--- a/src/libprojectM/ProjectM.cpp
++++ b/src/libprojectM/ProjectM.cpp
+@@ -32,6 +32,7 @@
+ #include <Renderer/PresetTransition.hpp>
+ #include <Renderer/ShaderCache.hpp>
+ #include <Renderer/TextureManager.hpp>
++#include <Renderer/Screenshot.hpp>
+ #include <Renderer/TransitionShaderManager.hpp>
+ 
+ #include <UserSprites/SpriteManager.hpp>
+@@ -217,6 +218,42 @@ void ProjectM::RenderFrame(uint32_t targetFramebufferObject /*= 0*/)
+ 
+     m_frameCount++;
+     m_previousFrameVolume = audioData.vol;
++
++    // Debug screenshot capture
++    if (!m_debugImageFilename.empty())
++    {
++        glBindFramebuffer(GL_READ_FRAMEBUFFER, static_cast<GLuint>(targetFramebufferObject));
++        Renderer::CaptureFramebufferBMP(m_debugImageFilename, m_windowWidth, m_windowHeight);
++        m_debugImageFilename.clear();
++    }
++}
++
++void ProjectM::TakeScreenshot(const std::string& filename)
++{
++    if (m_windowWidth == 0 || m_windowHeight == 0)
++    {
++        return;
++    }
++
++    // Ensure we read from the default framebuffer (front/back buffer).
++    // MilkdropPreset leaves internal FBOs bound after rendering, so we
++    // must explicitly reset the read framebuffer to FBO 0.
++    glBindFramebuffer(GL_READ_FRAMEBUFFER, 0);
++    glReadBuffer(GL_BACK);
++
++    Renderer::CaptureFramebufferBMP(filename, m_windowWidth, m_windowHeight);
++}
++
++void ProjectM::WriteDebugImageOnNextFrame(const std::string& filename)
++{
++    if (filename.empty())
++    {
++        m_debugImageFilename = Renderer::AutoScreenshotFilename("projectm-frame");
++    }
++    else
++    {
++        m_debugImageFilename = filename;
++    }
+ }
+ 
+ void ProjectM::Initialize()
+diff --git a/src/libprojectM/ProjectM.hpp b/src/libprojectM/ProjectM.hpp
+index 9879e77f0..f42dc90ec 100644
+--- a/src/libprojectM/ProjectM.hpp
++++ b/src/libprojectM/ProjectM.hpp
+@@ -214,6 +214,27 @@ public:
+      */
+     void SetPresetStartClean(bool enabled);
+ 
++    /**
++     * @brief Captures the currently bound framebuffer and writes it to a BMP file.
++     *
++     * Should be called after RenderFrame(). Reads from the currently bound
++     * GL_READ_FRAMEBUFFER using glReadPixels.
++     *
++     * @param filename Output BMP file path.
++     */
++    void TakeScreenshot(const std::string& filename);
++
++    /**
++     * @brief Flags the next rendered frame to be written to a BMP file.
++     *
++     * This is similar to TakeScreenshot() but is triggered automatically
++     * at the end of the next RenderFrame() call. If filename is empty,
++     * an auto-generated name will be used.
++     *
++     * @param filename Output BMP file path, or empty for auto-generated.
++     */
++    void WriteDebugImageOnNextFrame(const std::string& filename);
++
+     /**
+      * @brief Returns whether newly loaded presets start with a clean canvas.
+      * @return True if presets start with a clean canvas.
+@@ -329,7 +350,9 @@ private:
+     std::unique_ptr<Preset> m_activePreset;                                       //!< Currently loaded preset.
+     std::unique_ptr<Preset> m_transitioningPreset;                                //!< Destination preset when smooth preset switching.
+     std::unique_ptr<Renderer::PresetTransition> m_transition;                     //!< Transition effect used for blending.
+-    std::unique_ptr<TimeKeeper> m_timeKeeper;                                     //!< Keeps the different timers used to render and switch presets.
++    std::unique_ptr<TimeKeeper> m_timeKeeper;
++
++    std::string m_debugImageFilename; //!< If non-empty, capture the next rendered frame to this file.                                     //!< Keeps the different timers used to render and switch presets.
+     std::unique_ptr<UserSprites::SpriteManager> m_spriteManager;                  //!< Manages all types of user sprites.
+ };
+ 
+diff --git a/src/libprojectM/ProjectMCWrapper.cpp b/src/libprojectM/ProjectMCWrapper.cpp
+index cd2bca2f2..d658f0dfb 100644
+--- a/src/libprojectM/ProjectMCWrapper.cpp
++++ b/src/libprojectM/ProjectMCWrapper.cpp
+@@ -1,6 +1,7 @@
+ #include "ProjectMCWrapper.hpp"
+ 
+ #include "Renderer/Platform/GladLoader.hpp"
++#include "Renderer/Screenshot.hpp"
+ 
+ #include <projectM-4/projectM.h>
+ 
+@@ -479,9 +480,31 @@ auto projectm_pcm_add_uint8(projectm_handle instance, const uint8_t* samples, un
+     PcmAdd(instance, samples, count, channels);
+ }
+ 
+-auto projectm_write_debug_image_on_next_frame(projectm_handle, const char*) -> void
++auto projectm_write_debug_image_on_next_frame(projectm_handle instance, const char* output_file) -> void
+ {
+-    // UNIMPLEMENTED
++    auto* projectMInstance = handle_to_instance(instance);
++    if (output_file)
++    {
++        projectMInstance->WriteDebugImageOnNextFrame(output_file);
++    }
++    else
++    {
++        projectMInstance->WriteDebugImageOnNextFrame({});
++    }
++}
++
++auto projectm_take_screenshot(projectm_handle instance, const char* output_file) -> void
++{
++    auto* projectMInstance = handle_to_instance(instance);
++    if (output_file && output_file[0] != '\0')
++    {
++        projectMInstance->TakeScreenshot(output_file);
++    }
++    else
++    {
++        auto filename = libprojectM::Renderer::AutoScreenshotFilename("projectm-screenshot");
++        projectMInstance->TakeScreenshot(filename);
++    }
+ }
+ 
+ uint32_t projectm_sprite_create(projectm_handle instance, const char* type, const char* code)
+diff --git a/src/libprojectM/Renderer/CMakeLists.txt b/src/libprojectM/Renderer/CMakeLists.txt
+index 9de0a624f..c9a1771ff 100644
+--- a/src/libprojectM/Renderer/CMakeLists.txt
++++ b/src/libprojectM/Renderer/CMakeLists.txt
+@@ -46,6 +46,8 @@ add_library(Renderer OBJECT
+         RenderContext.hpp
+         Sampler.cpp
+         Sampler.hpp
++        Screenshot.cpp
++        Screenshot.hpp
+         Shader.cpp
+         Shader.hpp
+         ShaderCache.cpp
+diff --git a/src/sdl-test-ui/pmSDL.cpp b/src/sdl-test-ui/pmSDL.cpp
+index 8df0d7e74..84f57c30f 100644
+--- a/src/sdl-test-ui/pmSDL.cpp
++++ b/src/sdl-test-ui/pmSDL.cpp
+@@ -277,6 +277,10 @@ void projectMSDL::keyHandler(SDL_Event* sdl_evt)
+             UpdateWindowTitle();
+             break;
+ 
++        case SDLK_F12:
++            _requestScreenshot = true;
++            break;
++
+     }
+ }
+ 
+@@ -445,6 +449,14 @@ void projectMSDL::touchDestroyAll()
+     projectm_touch_destroy_all(_projectM);
+ }
+ 
++void projectMSDL::loadPresetFile(const std::string& path)
++{
++    projectm_playlist_clear(_playlist);
++    projectm_playlist_add_preset(_playlist, path.c_str(), false);
++    projectm_playlist_set_shuffle(_playlist, false);
++    projectm_playlist_set_position(_playlist, 0, true);
++}
++
+ void projectMSDL::renderFrame()
+ {
+     glClearColor(0.0, 0.0, 0.0, 0.0);
+@@ -452,6 +464,19 @@ void projectMSDL::renderFrame()
+ 
+     projectm_opengl_render_frame(_projectM);
+ 
++    if (_requestScreenshot)
++    {
++        _requestScreenshot = false;
++        if (_screenshotOutputPath.empty())
++        {
++            projectm_take_screenshot(_projectM, nullptr);
++        }
++        else
++        {
++            projectm_take_screenshot(_projectM, _screenshotOutputPath.c_str());
++        }
++    }
++
+     SDL_GL_SwapWindow(_sdlWindow);
+ }
+ 
+diff --git a/src/sdl-test-ui/pmSDL.hpp b/src/sdl-test-ui/pmSDL.hpp
+index bf706cb85..0c2d94078 100644
+--- a/src/sdl-test-ui/pmSDL.hpp
++++ b/src/sdl-test-ui/pmSDL.hpp
+@@ -40,6 +40,7 @@
+ #define STEREOSCOPIC_SBS 0
+ 
+ // projectM
++#include <projectM-4/debug.h>
+ #include <projectM-4/playlist.h>
+ #include <projectM-4/projectM.h>
+ 
+@@ -127,6 +128,7 @@ public:
+     void touchDestroyAll();
+     void renderFrame();
+     void pollEvent();
++    void loadPresetFile(const std::string& path);
+     bool keymod = false;
+     std::string getActivePresetName();
+     void addFakePCM();
+@@ -142,6 +144,13 @@ public:
+ 
+     SDL_GLContext _openGlContext{nullptr};
+ 
++    bool _shuffle{true};
++    bool _requestScreenshot{false};
++    std::string _cliPresetPath;        //!< Single preset to load at startup (from --preset)
++    std::string _screenshotOutputPath;  //!< Path for auto-screenshot (from --screenshot)
++    int _frameLimit{0};                 //!< If > 0, exit after this many frames (from --frames)
++    int _frameCount{0};                 //!< Frames rendered so far
++
+ private:
+     static void presetSwitchedEvent(bool isHardCut, uint32_t index, void* context);
+ 
+@@ -161,8 +170,6 @@ private:
+     size_t _height{0};
+     size_t _fps{60};
+ 
+-    bool _shuffle{true};
+-
+     // audio input device characteristics
+     unsigned int _numAudioDevices{0};
+     int _curAudioDevice{0}; // SDL's device indexes are 0-based, -1 means "system default"
+diff --git a/src/sdl-test-ui/projectM_SDL_main.cpp b/src/sdl-test-ui/projectM_SDL_main.cpp
+index a696f9951..a4372aefb 100644
+--- a/src/sdl-test-ui/projectM_SDL_main.cpp
++++ b/src/sdl-test-ui/projectM_SDL_main.cpp
+@@ -33,30 +33,40 @@
+ 
+ #include "pmSDL.hpp"
+ 
++#include <cstring>
++
+ static int mainLoop(void *userData) {
+     projectMSDL **appRef = (projectMSDL **)userData;
+     auto app = *appRef;
+-    
++
+ #if UNLOCK_FPS
+     auto start = startUnlockedFPSCounter();
+ #endif
+-    
++
+     // frame rate limiter
+     int fps = app->fps();
+     if (fps <= 0)
+         fps = 60;
+     const Uint32 frame_delay = 1000/fps;
+     Uint32 last_time = SDL_GetTicks();
+-    
++
+     // loop
+     while (! app->done) {
+-        // render
+         app->renderFrame();
+-        
++        app->_frameCount++;
++
+         if (app->fakeAudio)
+             app->addFakePCM();
+         processLoopbackFrame(app);
+-        
++
++        // Auto-screenshot after frameLimit frames, then exit
++        if (app->_frameLimit > 0 && app->_frameCount >= app->_frameLimit)
++        {
++            app->_requestScreenshot = true;
++            app->renderFrame(); // renders with screenshot flag, then exits
++            break;
++        }
++
+ #if UNLOCK_FPS
+         advanceUnlockedFPSCounterFrame(start);
+ #else
+@@ -67,13 +77,42 @@ static int mainLoop(void *userData) {
+         last_time = SDL_GetTicks();
+ #endif
+     }
+-    
++
+     return 0;
+ }
+ 
+ int main(int argc, char *argv[]) {
++    std::string presetPath;
++    std::string screenshotPath;
++    int frameLimit = 0;
++
++    // Parse CLI args
++    for (int i = 1; i < argc; i++)
++    {
++        if (std::strcmp(argv[i], "--preset") == 0 && i + 1 < argc)
++        {
++            presetPath = argv[++i];
++        }
++        else if (std::strcmp(argv[i], "--screenshot") == 0 && i + 1 < argc)
++        {
++            screenshotPath = argv[++i];
++        }
++        else if (std::strcmp(argv[i], "--frames") == 0 && i + 1 < argc)
++        {
++            frameLimit = std::atoi(argv[++i]);
++        }
++    }
++
+     projectMSDL *app = setupSDLApp();
+-    
++
++    if (!presetPath.empty())
++    {
++        app->_cliPresetPath = presetPath;
++        app->_screenshotOutputPath = screenshotPath;
++        app->_frameLimit = frameLimit;
++        app->loadPresetFile(presetPath);
++    }
++
+     int status = mainLoop(&app);
+ 
+     // cleanup
+@@ -83,7 +122,7 @@ int main(int argc, char *argv[]) {
+         app->endAudioCapture();
+ #endif
+     delete app;
+-    
++
+     return status;
+ }
+ 
+=== New files ===
+--- a/src/libprojectM/Renderer/Screenshot.hpp
++++ b/src/libprojectM/Renderer/Screenshot.hpp
++#pragma once
++
++#include <string>
++#include <cstdint>
++
++namespace libprojectM {
++namespace Renderer {
++
++/**
++ * @brief Writes a 24-bit BMP file from raw BGR pixel data.
++ * @param filename Output file path.
++ * @param pixels Pixel data in BGR order, bottom-up (OpenGL convention).
++ * @param width Image width in pixels.
++ * @param height Image height in pixels.
++ * @return True if the file was written successfully.
++ */
++bool WriteBMP(const std::string& filename, const uint8_t* pixels, uint32_t width, uint32_t height);
++
++/**
++ * @brief Reads the currently bound GL_READ_FRAMEBUFFER and writes a BMP.
++ * @param filename Output file path.
++ * @param width Framebuffer width.
++ * @param height Framebuffer height.
++ * @return True if the file was written successfully.
++ */
++bool CaptureFramebufferBMP(const std::string& filename, uint32_t width, uint32_t height);
++
++/**
++ * @brief Generates an auto-filename: <prefix>-YYYY-MM-DD-HHMMSS.bmp
++ */
++std::string AutoScreenshotFilename(const std::string& prefix);
++
++} // namespace Renderer
++} // namespace libprojectM
+--- a/src/libprojectM/Renderer/Screenshot.cpp
++++ b/src/libprojectM/Renderer/Screenshot.cpp
++#include "Screenshot.hpp"
++#include "OpenGL.h"
++
++#include <cstdio>
++#include <ctime>
++#include <vector>
++
++namespace libprojectM {
++namespace Renderer {
++
++bool WriteBMP(const std::string& filename, const uint8_t* pixels, uint32_t width, uint32_t height)
++{
++    FILE* f = fopen(filename.c_str(), "wb");
++    if (!f) return false;
++
++    uint32_t rowSize = (width * 3 + 3) & ~3; // row padded to 4 bytes
++    uint32_t pixelDataSize = rowSize * height;
++    uint32_t fileSize = 54 + pixelDataSize;
++
++    // BMP header
++    uint8_t header[54] = {};
++    header[0] = 'B';
++    header[1] = 'M';
++    header[2] = fileSize & 0xFF;
++    header[3] = (fileSize >> 8) & 0xFF;
++    header[4] = (fileSize >> 16) & 0xFF;
++    header[5] = (fileSize >> 24) & 0xFF;
++    header[10] = 54; // pixel data offset
++    header[14] = 40; // DIB header size
++    header[18] = width & 0xFF;
++    header[19] = (width >> 8) & 0xFF;
++    header[20] = (width >> 16) & 0xFF;
++    header[21] = (width >> 24) & 0xFF;
++    header[22] = height & 0xFF;
++    header[23] = (height >> 8) & 0xFF;
++    header[24] = (height >> 16) & 0xFF;
++    header[25] = (height >> 24) & 0xFF;
++    header[26] = 1;  // planes
++    header[28] = 24; // bpp
++
++    if (fwrite(header, 1, 54, f) != 54)
++    {
++        fclose(f);
++        return false;
++    }
++
++    // Pixel data (BGR, bottom-up — same as glReadPixels with GL_BGR)
++    for (uint32_t y = 0; y < height; y++)
++    {
++        const uint8_t* row = pixels + y * width * 3;
++        uint32_t written = 0;
++        while (written < width * 3)
++        {
++            size_t n = fwrite(row + written, 1, width * 3 - written, f);
++            if (n == 0) { fclose(f); return false; }
++            written += n;
++        }
++        // padding
++        for (uint32_t p = width * 3; p < rowSize; p++)
++        {
++            fputc(0, f);
++        }
++    }
++
++    fclose(f);
++    return true;
++}
++
++bool CaptureFramebufferBMP(const std::string& filename, uint32_t width, uint32_t height)
++{
++    if (width == 0 || height == 0) return false;
++
++    std::vector<uint8_t> pixels(width * height * 3);
++    glReadPixels(0, 0, static_cast<GLsizei>(width), static_cast<GLsizei>(height),
++                 GL_BGR, GL_UNSIGNED_BYTE, pixels.data());
++
++    return WriteBMP(filename, pixels.data(), width, height);
++}
++
++std::string AutoScreenshotFilename(const std::string& prefix)
++{
++    std::time_t t = std::time(nullptr);
++    char buf[128];
++    std::strftime(buf, sizeof(buf), "%Y-%m-%d-%H%M%S", std::localtime(&t));
++    return prefix + "-" + buf + ".bmp";
++}
++
++} // namespace Renderer
++} // namespace libprojectM
