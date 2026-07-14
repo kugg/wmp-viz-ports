@@ -371,7 +371,89 @@ cd ~/.projectM
 - No audio required — renders with synthetic audio
 - Look for `ERROR` lines in output — those are EEL/HLSL compilation failures
 
-## Step 10: Iterate
+## Step 10: Visual Approximation (When Decompilation Fails)
+
+If decompilation yields complex DirectDraw/GDI code that's hard to reverse-engineer, use **visual approximation** from screenshots:
+
+### Analyze Original Screenshots
+
+```python
+from PIL import Image
+import numpy as np
+
+img = Image.open('original_screenshot.jpg')
+arr = np.array(img)
+
+# Color palette
+print(f'Mean RGB: {arr.mean(axis=(0,1))}')
+
+# Spatial distribution
+h, w = arr.shape[:2]
+cy, cx = h//2, w//2
+for r_frac in [0.1, 0.2, 0.3, 0.4, 0.5]:
+    r = int(min(h,w) * r_frac)
+    mask = ((X - cx)**2 + (Y - cy)**2) <= r**2
+    region = arr[mask]
+    print(f'r={r_frac}: mean={region.mean(axis=0)}')
+
+# Symmetry check
+left = arr[:, :w//2]
+right = arr[:, w//2:][:, ::-1]
+diff = np.abs(left.astype(float) - right.astype(float)).mean()
+print(f'Left-right symmetry diff: {diff:.2f}')
+```
+
+### Create Composite Shader Preset
+
+Use math-simulated effects instead of audio-reactive FFT:
+
+```ini
+MILKDROP_PRESET_VERSION=201
+PSVERSION=2
+PSVERSION_COMP=2
+[preset00]
+fDecay=0.950000
+
+per_frame_1=warp = 0;
+per_frame_2=wave_a = 0;
+
+comp_1=`shader_body
+comp_2=`{
+comp_3=`  float2 uv_c = uv - 0.5;
+comp_4=`  float r = length(uv_c);
+comp_5=`  float angle = atan2(uv_c.y, uv_c.x);
+comp_6=`  float t = time * 0.5;
+comp_7=`
+comp_8=`  // Create pattern based on screenshot analysis
+comp_9=`  float pattern = sin(angle * 3.0 + r * 12.0 - t * 2.0);
+comp_10=`  float brightness = max(0.0, 1.0 - r * 2.0);
+comp_11=`  brightness = brightness * brightness;
+comp_12=`  float glow = pattern * brightness;
+comp_13=`
+comp_14=`  // Match color palette from screenshot
+comp_15=`  ret = float3(glow * 1.0, glow * 0.55, glow * 0.18);
+comp_16=`}
+```
+
+### Key Patterns
+
+- **Spiral**: `sin(angle * N + r * M - t * S)` — N=arms, M=tightness, S=speed
+- **Radial gradient**: `max(0, 1 - r * falloff)` — controls brightness distribution
+- **Wing-like**: `sin(angle * 2) * sin(angle * 2) * max(0, offset - uv_c.y)`
+- **Color matching**: Adjust RGB ratios to match screenshot mean colors
+
+### Validate
+
+```bash
+# Test compilation
+venv/bin/python3 validate_milk.py preset.milk
+
+# Take screenshot and compare
+projectM-Test-UI --preset preset.milk --screenshot out.bmp --frames 60
+venv/bin/python3 compare_screenshots.py out.bmp original.jpg
+```
+
+## Step 11: Iterate
 
 1. Start with the simplest visualization
 2. Create a minimal preset
