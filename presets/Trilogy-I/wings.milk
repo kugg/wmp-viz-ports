@@ -1,0 +1,76 @@
+MILKDROP_PRESET_VERSION=201
+PSVERSION=2
+PSVERSION_COMP=2
+[preset00]
+fRating=3.000000
+fGammaAdj=1.000000
+fVideoEchoZoom=1.000000
+fVideoEchoAngle=0.000000
+fWaveMode=0
+bWaveThick=false
+bAdditiveWaves=false
+bWaveDarken=false
+bSmooth=true
+fWaveAlpha=0.000000
+fWaveScale=1.000000
+fWaveSmoothing=0.500000
+fWaveAspect=1.000000
+fWarpAnimSpeed=1.000000
+fWarpScale=1.500000
+fZoomExponent=1.000000
+fZoom=1.000000
+fSpin=0.000000
+fZoomCamera=0.000000
+dx=0.000000
+dy=0.000000
+cx=0.500000
+cy=0.500000
+sx=1.000000
+sy=1.000000
+ob_size=0.000000
+ob_r=0.000000
+ob_g=0.000000
+ob_b=0.000000
+ob_a=0.000000
+ib_size=0.000000
+ib_r=0.000000
+ib_g=0.000000
+ib_b=0.000000
+ib_a=0.000000
+wave_r=1.000000
+wave_g=1.000000
+wave_b=1.000000
+wave_a=0.000000
+wave_mode=0
+wave_scale=1.000000
+wave_smoothing=0.500000
+wave_mystery=0.000000
+wave_aspect=1.000000
+fDecay=0.950000
+
+per_frame_1=warp = 0;
+per_frame_2=wave_a = 0;
+
+comp_1=`shader_body
+comp_2=`{
+comp_3=`  float2 uv_c = uv - 0.5;
+comp_4=`  float r = length(uv_c);
+comp_5=`  float angle = atan2(uv_c.y, uv_c.x);
+comp_6=`  float t = time * 0.4;
+comp_7=`
+comp_8=`  float wing_up = max(0.0, 0.3 - uv_c.y);
+comp_9=`  float wing_shape = sin(angle * 2.0) * sin(angle * 2.0);
+comp_10=`  float feather = 0.5 + 0.5 * sin(angle * 8.0 + r * 6.0);
+comp_11=`  float wing = wing_shape * feather * wing_up;
+comp_12=`  float brightness = max(0.0, 1.0 - r * 1.2);
+comp_13=`  wing = wing * brightness * 5.0 + 0.2;
+comp_14=`
+comp_15=`  float pulse = 0.85 + 0.15 * sin(t * 1.5);
+comp_16=`  wing = wing * pulse;
+comp_17=`
+comp_18=`  float r_col = wing * 0.005;
+comp_19=`  float g_col = wing * 0.9;
+comp_20=`  float b_col = wing * 0.7;
+comp_21=`
+comp_22=`  ret = float3(r_col, g_col, b_col);
+comp_23=`}
