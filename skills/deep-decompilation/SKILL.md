@@ -419,6 +419,167 @@ milky/
     └── deep-decompilation/          # This skill
 ```
 
+## Reverse Engineering Techniques: Variables, Types, and Parameters
+
+### Technique 1: API Call Site Type Inference
+
+The most powerful technique for identifying field types. Every Windows API call constrains the types of its arguments:
+
+```c
+// If code calls: HeapFree(g_hProcessHeap, 0, param_1[0x32a9])
+// Then param_1[0x32a9] MUST be void* (LPVOID)
+
+// If code calls: StretchDIBits(hdc, ..., (void*)param_1[0x31fc], (BITMAPINFO*)param_1[0x3207], ...)
+// Then param_1[0x31fc] is void* (pixel data), param_1[0x3207] is BITMAPINFO*
+
+// If code calls: CreateDIBitmap(hdc, (BITMAPINFOHEADER*)param_1[0x3208], ...)
+// Then param_1[0x3208] is BITMAPINFO*
+
+// If code calls: GetForegroundWindow() and stores result in param_1[0xc980]
+// Then param_1[0xc980] is HWND
+```
+
+**Process:**
+1. Find Windows API call in decompiled code
+2. Look up the API signature (use `winsdk-include/` headers)
+3. Map each argument to the struct field it reads from
+4. The SDK parameter type constrains the field type
+
+### Technique 2: Vtable Dispatch Pattern Recognition
+
+Every `(**(code **)(*param_1 + 0xNN))(param_1, ...)` is a virtual method call:
+
+```c
+// Pattern: (*vtable_offset)(this_ptr, args...)
+(**(code **)(*param_1 + 0x260))(param_1);    // this->vtable[0x260/4](this)
+(**(code **)(*param_1 + 0x50))(param_1);     // this->vtable[0x50/4](this)
+(**(code **)(*param_1 + 0x148))(param_1);    // this->vtable[0x148/4](this)
+```
+
+**Process:**
+1. Collect ALL vtable offsets used across all functions
+2. Sort numerically — these are sequential vtable entries
+3. Identify known offsets from SDK (IUnknown: 0x00=QI, 0x04=AddRef, 0x08=Release)
+4. Map unknown offsets by their calling context (render loop = render methods, cleanup = destructor)
+
+### Technique 3: Allocation Size → Struct Size
+
+```c
+puVar1 = operator_new(0xd0ac);   // Total object size = 53,420 bytes
+InitStateDefaults((int)(puVar1 + 2));  // State starts at +8 bytes (2 ints)
+// Therefore: state struct = 0xD0AC - 0x08 = 0xD0A4 bytes
+```
+
+```c
+_malloc(param_1[0x3308] * param_1[0x3306] * 4);
+// param_1[0x3306] * 4 = stride in bytes → param_1[0x3306] is width (pixels)
+// param_1[0x3308] is height
+// param_1[0x3307] = param_1[0x3306] * 4 → stride = width * 4 (BGRA)
+```
+
+### Technique 4: Cross-Reference Init Patterns
+
+Functions that initialize fields reveal default values and intended semantics:
+
+```c
+// InitStateDefaults sets these to 0:
+*(undefined4 *)(param_1 + 0xc864) = 0;   // → zeroed flag/counter
+*(undefined4 *)(param_1 + 0xc9b4) = 0;   // → buffers_allocated (checked before use)
+*(undefined4 *)(param_1 + 0xca6c) = 0;   // → unknown flag
+*(undefined4 *)(param_1 + 0xcaa0) = 0;   // → work buffer pointer
+
+// InitStateDefaults sets this to 0xFF:
+*(undefined4 *)(param_1 + 0x9c) = 0xff;  // → sentinel value (invalid index?)
+
+// InitStateDefaults sets this to 1:
+*(undefined4 *)(param_1 + 0xc9e4) = 1;   // → initialized flag
+```
+
+### Technique 5: Conditional Access Patterns
+
+How a field is tested reveals its semantics:
+
+```c
+if (param_1[0x326d] != 0) {              // "if buffers allocated"
+    HeapFree_Wrapper(param_1[0x32a9]);    // "free staging buffer"
+    param_1[0x326d] = 0;                 // "mark as freed"
+}
+// → param_1[0x326d] is a boolean flag: buffers_allocated
+
+if (param_1[0x3229] == 0x18 || param_1[0x3229] == 0x10) {
+    // 0x18 = 24bpp, 0x10 = 16bpp
+}
+// → param_1[0x3229] is color_depth (bits per pixel)
+
+if (param_1[0x3309] != 0) {
+    // Single preset mode
+}
+// → param_1[0x3309] is single_preset_mode flag
+```
+
+### Technique 6: Arithmetic Expression → Field Semantics
+
+```c
+param_1[0x3307] = param_1[0x3306] * 4;
+// stride = width * 4 bytes (BGRA pixel format)
+// → 0x3306 = frame_width, 0x3307 = frame_stride
+
+param_1[0x3234] = param_1[0x32a4] / 2;
+param_1[0x3236] = param_1[0x32a5] / 2;
+// center = dimension / 2
+// → 0x32a4 = main_width, 0x3234 = center_x
+// → 0x32a5 = main_height, 0x3236 = center_y
+
+malloc(param_1[0x3225] * param_1[0x3224] * 4);
+// allocation = width * height * 4 bytes
+// → 0x3225 = buf_width, 0x3224 = buf_height
+```
+
+### Technique 7: Two-Function Access Pattern (Cast Chain)
+
+When `InitStateDefaults` receives `param_1 + 4`, all its internal offsets are shifted:
+
+```c
+// In InitStateDefaults(param_1 + 4):
+*(int*)(param_1 + 0x98) = 0;    // → state byte offset 0x98 + 4 = 0x9C
+*(int*)(param_1 + 0xa0) = 0;    // → state byte offset 0xA0 + 4 = 0xA4
+```
+
+**Rule:** If `func(state + N)` uses `*(type*)(param_1 + M)`, the actual state offset is `M + N`.
+
+### Technique 8: Preset Array Formula Decomposition
+
+```c
+param_1[param_1[0x3240] * 0x7b + 0xc3f]
+// = state[current_preset * 0x7B + 0xC3F]
+// Byte offset = (current_preset * 0x7B + 0xC3F) * 4
+//             = current_preset * 0x1EC + 0x30FC
+// Stride = 0x1EC (492 bytes per preset)
+// Base = 0x30E4 (byte offset of first preset)
+```
+
+### Technique 9: Cross-DLL Comparison
+
+TrilogyII has shifted addresses (+0x10 for most functions). Comparing identical functions at different addresses reveals:
+- Which offsets are compile-time constants (same values)
+- Which are relocated data pointers (shifted)
+- Which are unique to a build (TrilogyII-only functions)
+
+### Technique 10: Iteration Pattern → Array Bounds
+
+```c
+// In FreeAllBuffers:
+param_1[0x3298] = 0;                              // loop index = 0
+pBuffer = param_1[param_1[0x3298] + 0x31ea];       // base at 0x31EA
+param_1[param_1[0x3298] + 0x31ea] = 0;             // zero the entry
+iVar2 = param_1[0x3298];
+param_1[0x3298] = iVar2 + 1U;                      // increment
+} while (iVar2 + 1U <= (uint)param_1[0x32a3]);     // compare against max
+
+// → 0x3298 = loop index, 0x32a3 = max count
+// → preset_texture_ptrs base at state[(0x31EA * 4)] = byte 0xC3A8
+```
+
 ## Automation Scripts
 
 ### rename_decompiled.py
