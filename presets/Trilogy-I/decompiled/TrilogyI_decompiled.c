@@ -231,14 +231,14 @@ undefined4 Update_FPSCounter(int param_1)
 undefined4 Render_AllPresets(int *param_1)
 
 {
-  int iVar1;
+  int visIndex;
   
   param_1[0x3240] = 0;
   do {
     (**(code **)(*param_1 + 0x54))(param_1);
-    iVar1 = param_1[0x3240];
-    param_1[0x3240] = iVar1 + 1U;
-  } while (iVar1 + 1U <= (uint)param_1[0x32a1]);
+    visIndex = param_1[0x3240];
+    param_1[0x3240] = visIndex + 1U;
+  } while (visIndex + 1U <= (uint)param_1[0x32a1]);
   return 0;
 }
 
@@ -413,24 +413,24 @@ void __fastcall Release_PresetData(undefined4 *param_1)
 // Function: IWMPEffects_Render @ 10001e50
 ======================================================================
 
-undefined4 IWMPEffects_Render(int *param_1)
+undefined4 IWMPEffects_Render(int *pEffects)
 
 {
   int renderResult;
   
-  (**(code **)(*param_1 + 0x280))(param_1);
-  param_1[0x3428] = 0;
-  renderResult = param_1[0x269e];
-  param_1[0x3240] = renderResult;
+  (**(code **)(*pEffects + 0x280))(pEffects);
+  pEffects[0x3428] = 0;
+  renderResult = pEffects[0x269e];
+  pEffects[0x3240] = renderResult;
   while (renderResult != -1) {
-    if (param_1[param_1[0x3240] * 0x7b + 0xc3f] == 2) {
-      param_1[param_1[0x3240] * 0x7b + 0xc3f] = 1;
+    if (pEffects[pEffects[0x3240] * 0x7b + 0xc3f] == 2) {
+      pEffects[pEffects[0x3240] * 0x7b + 0xc3f] = 1;
     }
-    (**(code **)(*param_1 + 0x188))(param_1);
-    renderResult = param_1[0x3428];
-    param_1[0x3428] = renderResult + 1;
-    renderResult = param_1[renderResult + 0x269f];
-    param_1[0x3240] = renderResult;
+    (**(code **)(*pEffects + 0x188))(pEffects);
+    renderResult = pEffects[0x3428];
+    pEffects[0x3428] = renderResult + 1;
+    renderResult = pEffects[renderResult + 0x269f];
+    pEffects[0x3240] = renderResult;
   }
   return 0;
 }
@@ -442,21 +442,21 @@ undefined4 IWMPEffects_Render(int *param_1)
 // Function: IWMPEffects_MediaInfo @ 10001ee0
 ======================================================================
 
-undefined4 IWMPEffects_MediaInfo(int *param_1)
+undefined4 IWMPEffects_MediaInfo(int *pEffects)
 
 {
   int mediaInfoResult;
   
-  (**(code **)(*param_1 + 0x284))(param_1);
-  param_1[0x3428] = 0;
-  mediaInfoResult = param_1[0x269e];
-  param_1[0x3240] = mediaInfoResult;
+  (**(code **)(*pEffects + 0x284))(pEffects);
+  pEffects[0x3428] = 0;
+  mediaInfoResult = pEffects[0x269e];
+  pEffects[0x3240] = mediaInfoResult;
   while (mediaInfoResult != -1) {
-    (**(code **)(*param_1 + 0x188))(param_1);
-    mediaInfoResult = param_1[0x3428];
-    param_1[0x3428] = mediaInfoResult + 1;
-    mediaInfoResult = param_1[mediaInfoResult + 0x269f];
-    param_1[0x3240] = mediaInfoResult;
+    (**(code **)(*pEffects + 0x188))(pEffects);
+    mediaInfoResult = pEffects[0x3428];
+    pEffects[0x3428] = mediaInfoResult + 1;
+    mediaInfoResult = pEffects[mediaInfoResult + 0x269f];
+    pEffects[0x3240] = mediaInfoResult;
   }
   return 0;
 }
@@ -468,21 +468,21 @@ undefined4 IWMPEffects_MediaInfo(int *param_1)
 // Function: IWMPEffects_SetUserPreset @ 10001f40
 ======================================================================
 
-undefined4 IWMPEffects_SetUserPreset(int *param_1)
+undefined4 IWMPEffects_SetUserPreset(int *pEffects)
 
 {
   int presetIndex;
   
-  (**(code **)(*param_1 + 0x27c))(param_1);
-  param_1[0x3428] = 0;
-  presetIndex = param_1[0x269e];
-  param_1[0x3240] = presetIndex;
+  (**(code **)(*pEffects + 0x27c))(pEffects);
+  pEffects[0x3428] = 0;
+  presetIndex = pEffects[0x269e];
+  pEffects[0x3240] = presetIndex;
   while (presetIndex != -1) {
-    (**(code **)(*param_1 + 0x188))(param_1);
-    presetIndex = param_1[0x3428];
-    param_1[0x3428] = presetIndex + 1;
-    presetIndex = param_1[presetIndex + 0x269f];
-    param_1[0x3240] = presetIndex;
+    (**(code **)(*pEffects + 0x188))(pEffects);
+    presetIndex = pEffects[0x3428];
+    pEffects[0x3428] = presetIndex + 1;
+    presetIndex = pEffects[presetIndex + 0x269f];
+    pEffects[0x3240] = presetIndex;
   }
   return 0;
 }
