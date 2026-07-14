@@ -7444,7 +7444,7 @@ int DllRegisterServer(void)
         if (DAT_10025020 == 0x84) {
           iVar4 = 1;
           piVar2 = (int *)(*(code *)piVar3[7])();
-          iVar4 = FUN_10013bd0(*piVar3,piVar2,iVar4);
+          iVar4 = Reg_RegisterTypeLib(*piVar3,piVar2,iVar4);
           if (iVar4 < 0) {
             return iVar4;
           }
@@ -7461,7 +7461,7 @@ int DllRegisterServer(void)
       return iVar4;
     }
   }
-  iVar4 = FUN_10013f70(0x10025020,(LPCWSTR)0x0);
+  iVar4 = Reg_RegisterServer(0x10025020,(LPCWSTR)0x0);
   return iVar4;
 }
 
@@ -7486,7 +7486,7 @@ undefined4 DllUnregisterServer(void)
   piVar3 = DAT_10025030;
   do {
     if (iVar1 == 0) {
-      FUN_10013d00(0x10025020,(LPCWSTR)0x0);
+      Reg_UnregisterServer(0x10025020,(LPCWSTR)0x0);
       return 0;
     }
     if ((((code *)piVar3[6] == (code *)0x0) || (iVar1 = (*(code *)piVar3[6])(), iVar1 == 0)) &&
@@ -7494,7 +7494,7 @@ undefined4 DllUnregisterServer(void)
       if ((code *)piVar3[7] != (code *)0x0) {
         iVar1 = 0;
         piVar2 = (int *)(*(code *)piVar3[7])();
-        FUN_10013bd0(*piVar3,piVar2,iVar1);
+        Reg_RegisterTypeLib(*piVar3,piVar2,iVar1);
         goto LAB_10010c6d;
       }
 LAB_10010c7b:
@@ -9237,7 +9237,7 @@ LAB_10012de3:
             lstrcpynA(pCVar6,param_1,0x104);
             if (((param_4 == (LPSTR)0x0) &&
                 (bVar3 = FUN_10013950((HKEY)0x0), CONCAT31(extraout_var,bVar3) == 0)) &&
-               (iVar5 = FUN_100139a0(0,(char)unaff_EDI), iVar5 == 0)) {
+               (iVar5 = Reg_QueryKeyInfo(0,(char)unaff_EDI), iVar5 == 0)) {
 LAB_1001321b:
               pCVar6 = (LPCSTR)0x10013223;
               LVar9 = FUN_10013300((undefined4 *)&stack0xffffffec);
@@ -9250,7 +9250,7 @@ LAB_1001321b:
             }
             else {
               uVar11 = ParseToken(this,param_1);
-              if (((int)uVar11 < 0) || (uVar11 = FUN_10013a50(), (int)uVar11 < 0))
+              if (((int)uVar11 < 0) || (uVar11 = Reg_ParseConfigValue(), (int)uVar11 < 0))
               goto LAB_10013281;
               if (*param_1 != '{') {
                 if (param_4 != (LPSTR)0x0) goto LAB_10012cdf;
@@ -9279,7 +9279,7 @@ LAB_10013208:
             }
             param_4 = pCVar4;
             uVar11 = ParseToken(this,param_1);
-            if ((-1 < (int)uVar11) && (uVar11 = FUN_10013a50(), -1 < (int)uVar11))
+            if ((-1 < (int)uVar11) && (uVar11 = Reg_ParseConfigValue(), -1 < (int)uVar11))
             goto LAB_10012cdf;
             goto LAB_10013281;
           }
@@ -9966,14 +9966,14 @@ bool FUN_10013950(HKEY param_1)
 
 
 ======================================================================
-// Function: FUN_100139a0 @ 100139a0
+// Function: Reg_QueryKeyInfo @ 100139a0
 ======================================================================
 
 /* WARNING: Removing unreachable block (ram,0x100139f3) */
 /* WARNING: Removing unreachable block (ram,0x10013a1a) */
 /* WARNING: Removing unreachable block (ram,0x10013a22) */
 
-undefined4 FUN_100139a0(DWORD param_1,char param_2)
+undefined4 Reg_QueryKeyInfo(DWORD param_1,char param_2)
 
 {
   LSTATUS LVar1;
@@ -9993,10 +9993,10 @@ undefined4 FUN_100139a0(DWORD param_1,char param_2)
 
 
 ======================================================================
-// Function: FUN_10013a50 @ 10013a50
+// Function: Reg_ParseConfigValue @ 10013a50
 ======================================================================
 
-int FUN_10013a50(void)
+int Reg_ParseConfigValue(void)
 
 {
   CHAR CVar1;
@@ -10101,10 +10101,10 @@ LAB_10013b1b:
 
 
 ======================================================================
-// Function: FUN_10013bd0 @ 10013bd0
+// Function: Reg_RegisterTypeLib @ 10013bd0
 ======================================================================
 
-int FUN_10013bd0(undefined4 param_1,int *param_2,int param_3)
+int Reg_RegisterTypeLib(undefined4 param_1,int *param_2,int param_3)
 
 {
   int *piVar1;
@@ -10179,10 +10179,10 @@ int FUN_10013bd0(undefined4 param_1,int *param_2,int param_3)
 
 
 ======================================================================
-// Function: FUN_10013d00 @ 10013d00
+// Function: Reg_UnregisterServer @ 10013d00
 ======================================================================
 
-int FUN_10013d00(int param_1,LPCWSTR param_2)
+int Reg_UnregisterServer(int param_1,LPCWSTR param_2)
 
 {
   LPCWSTR pWVar1;
@@ -10316,10 +10316,10 @@ LPSTR FUN_10013f40(LPSTR param_1,LPCWSTR param_2,int param_3,UINT param_4)
 
 
 ======================================================================
-// Function: FUN_10013f70 @ 10013f70
+// Function: Reg_RegisterServer @ 10013f70
 ======================================================================
 
-int FUN_10013f70(int param_1,LPCWSTR param_2)
+int Reg_RegisterServer(int param_1,LPCWSTR param_2)
 
 {
   int iVar1;
@@ -10407,7 +10407,7 @@ LAB_100140d6:
       pWVar5 = (LPCWSTR)((int)pWVar5 + 1);
       psVar6 = (short *)((int)psVar6 + 1);
     }
-    iVar1 = FUN_10014170(local_220);
+    iVar1 = Str_FindFileNameW(local_220);
     pWVar5 = local_14;
     local_220[iVar1] = 0;
     iVar1 = Ordinal_163(local_18,pWVar5,local_220);
@@ -10425,10 +10425,10 @@ LAB_100140d6:
 
 
 ======================================================================
-// Function: FUN_10014170 @ 10014170
+// Function: Str_FindFileNameW @ 10014170
 ======================================================================
 
-int FUN_10014170(short *param_1)
+int Str_FindFileNameW(short *param_1)
 
 {
   short sVar1;
@@ -10663,10 +10663,10 @@ void FUN_10014530(int param_1)
 
 
 ======================================================================
-// Function: FUN_10014680 @ 10014680
+// Function: Motion_UpdateAll @ 10014680
 ======================================================================
 
-undefined4 FUN_10014680(int *param_1)
+undefined4 Motion_UpdateAll(int *param_1)
 
 {
   int iVar1;
@@ -10700,10 +10700,10 @@ undefined4 FUN_10014680(int *param_1)
 
 
 ======================================================================
-// Function: FUN_10014860 @ 10014860
+// Function: IterateActivePresets @ 10014860
 ======================================================================
 
-undefined4 FUN_10014860(int *param_1)
+undefined4 IterateActivePresets(int *param_1)
 
 {
   int iVar1;
@@ -10723,10 +10723,10 @@ undefined4 FUN_10014860(int *param_1)
 
 
 ======================================================================
-// Function: FUN_10014e70 @ 10014e70
+// Function: State_SetDefaults @ 10014e70
 ======================================================================
 
-undefined4 FUN_10014e70(int param_1)
+undefined4 State_SetDefaults(int param_1)
 
 {
   uint uVar1;
@@ -10786,10 +10786,10 @@ LAB_10014f1a:
 
 
 ======================================================================
-// Function: FUN_10014f80 @ 10014f80
+// Function: Effect_RunPipeline @ 10014f80
 ======================================================================
 
-undefined4 FUN_10014f80(int *param_1)
+undefined4 Effect_RunPipeline(int *param_1)
 
 {
   (**(code **)(*param_1 + 0x200))(param_1);
@@ -10805,10 +10805,10 @@ undefined4 FUN_10014f80(int *param_1)
 
 
 ======================================================================
-// Function: FUN_100151d0 @ 100151d0
+// Function: Audio_RotateSpectrumBuffers @ 100151d0
 ======================================================================
 
-undefined4 FUN_100151d0(int param_1)
+undefined4 Audio_RotateSpectrumBuffers(int param_1)
 
 {
   uint uVar1;
@@ -10916,10 +10916,10 @@ LAB_10015251:
 
 
 ======================================================================
-// Function: FUN_10015350 @ 10015350
+// Function: State_ResetAudio @ 10015350
 ======================================================================
 
-undefined4 FUN_10015350(int param_1)
+undefined4 State_ResetAudio(int param_1)
 
 {
   undefined4 uVar1;
@@ -10974,12 +10974,12 @@ undefined4 FUN_10015350(int param_1)
 
 
 ======================================================================
-// Function: FUN_10015540 @ 10015540
+// Function: State_ResetAll @ 10015540
 ======================================================================
 
 /* WARNING: Globals starting with '_' overlap smaller symbols at the same address */
 
-undefined4 FUN_10015540(int param_1)
+undefined4 State_ResetAll(int param_1)
 
 {
   int iVar1;
@@ -11206,10 +11206,10 @@ undefined4 InitAllVisParams(int param_1)
 
 
 ======================================================================
-// Function: FUN_10015b10 @ 10015b10
+// Function: Resource_LoadPresetData @ 10015b10
 ======================================================================
 
-undefined4 FUN_10015b10(int *param_1)
+undefined4 Resource_LoadPresetData(int *param_1)
 
 {
   int iVar1;
@@ -11241,10 +11241,10 @@ undefined4 FUN_10015b10(int *param_1)
 
 
 ======================================================================
-// Function: FUN_10015cc0 @ 10015cc0
+// Function: State_InitParams @ 10015cc0
 ======================================================================
 
-undefined4 FUN_10015cc0(int *param_1)
+undefined4 State_InitParams(int *param_1)
 
 {
   int iVar1;
@@ -11378,12 +11378,12 @@ undefined4 FUN_10015cc0(int *param_1)
 
 
 ======================================================================
-// Function: FUN_100162d0 @ 100162d0
+// Function: Motion_CalcPresetXY @ 100162d0
 ======================================================================
 
 /* WARNING: Globals starting with '_' overlap smaller symbols at the same address */
 
-undefined4 FUN_100162d0(int param_1)
+undefined4 Motion_CalcPresetXY(int param_1)
 
 {
   int iVar1;
@@ -11422,12 +11422,12 @@ undefined4 FUN_100162d0(int param_1)
 
 
 ======================================================================
-// Function: FUN_100165b0 @ 100165b0
+// Function: Motion_CalcPresetX @ 100165b0
 ======================================================================
 
 /* WARNING: Globals starting with '_' overlap smaller symbols at the same address */
 
-undefined4 FUN_100165b0(int param_1)
+undefined4 Motion_CalcPresetX(int param_1)
 
 {
   float fVar1;
@@ -11458,12 +11458,12 @@ undefined4 FUN_100165b0(int param_1)
 
 
 ======================================================================
-// Function: FUN_100166a0 @ 100166a0
+// Function: Motion_CalcPresetXY2 @ 100166a0
 ======================================================================
 
 /* WARNING: Globals starting with '_' overlap smaller symbols at the same address */
 
-undefined4 FUN_100166a0(int param_1)
+undefined4 Motion_CalcPresetXY2(int param_1)
 
 {
   int iVar1;
@@ -11502,12 +11502,12 @@ undefined4 FUN_100166a0(int param_1)
 
 
 ======================================================================
-// Function: FUN_100169f0 @ 100169f0
+// Function: Motion_CalcPresetXYZ @ 100169f0
 ======================================================================
 
 /* WARNING: Globals starting with '_' overlap smaller symbols at the same address */
 
-undefined4 FUN_100169f0(int param_1)
+undefined4 Motion_CalcPresetXYZ(int param_1)
 
 {
   int iVar1;
@@ -11553,10 +11553,10 @@ undefined4 FUN_100169f0(int param_1)
 
 
 ======================================================================
-// Function: FUN_10016bb0 @ 10016bb0
+// Function: Render_PresetLoop @ 10016bb0
 ======================================================================
 
-undefined4 FUN_10016bb0(int *param_1)
+undefined4 Render_PresetLoop(int *param_1)
 
 {
   if (param_1[0x3293] != param_1[0x330d]) {
@@ -11589,10 +11589,10 @@ undefined4 FUN_10016bb0(int *param_1)
 
 
 ======================================================================
-// Function: FUN_10016c80 @ 10016c80
+// Function: Render_PresetSetup @ 10016c80
 ======================================================================
 
-undefined4 FUN_10016c80(int *param_1)
+undefined4 Render_PresetSetup(int *param_1)
 
 {
   param_1[0x3225] = param_1[0xc53];
@@ -11612,10 +11612,10 @@ undefined4 FUN_10016c80(int *param_1)
 
 
 ======================================================================
-// Function: FUN_10016d10 @ 10016d10
+// Function: Render_SwapFrameBuffers @ 10016d10
 ======================================================================
 
-undefined4 FUN_10016d10(int *param_1)
+undefined4 Render_SwapFrameBuffers(int *param_1)
 
 {
   int iVar1;
@@ -11682,10 +11682,10 @@ LAB_10016e04:
 
 
 ======================================================================
-// Function: FUN_100171a0 @ 100171a0
+// Function: Waveform_CopyMultiBPP @ 100171a0
 ======================================================================
 
-undefined4 FUN_100171a0(int param_1)
+undefined4 Waveform_CopyMultiBPP(int param_1)
 
 {
   int *piVar1;
@@ -11763,10 +11763,10 @@ undefined4 FUN_100171a0(int param_1)
 
 
 ======================================================================
-// Function: FUN_10017300 @ 10017300
+// Function: Waveform_Copy4BPP @ 10017300
 ======================================================================
 
-undefined4 FUN_10017300(int param_1)
+undefined4 Waveform_Copy4BPP(int param_1)
 
 {
   int iVar1;
@@ -11811,10 +11811,10 @@ undefined4 FUN_10017300(int param_1)
 
 
 ======================================================================
-// Function: FUN_10017400 @ 10017400
+// Function: Waveform_CopyWithScroll @ 10017400
 ======================================================================
 
-longlong FUN_10017400(int param_1)
+longlong Waveform_CopyWithScroll(int param_1)
 
 {
   longlong lVar1;
@@ -11872,10 +11872,10 @@ longlong FUN_10017400(int param_1)
 
 
 ======================================================================
-// Function: FUN_10017510 @ 10017510
+// Function: Waveform_CopyAndFill @ 10017510
 ======================================================================
 
-undefined4 FUN_10017510(int param_1)
+undefined4 Waveform_CopyAndFill(int param_1)
 
 {
   undefined4 uVar1;
@@ -11922,10 +11922,10 @@ undefined4 FUN_10017510(int param_1)
 
 
 ======================================================================
-// Function: FUN_10017610 @ 10017610
+// Function: Waveform_CopyWithMirror @ 10017610
 ======================================================================
 
-undefined4 FUN_10017610(int param_1)
+undefined4 Waveform_CopyWithMirror(int param_1)
 
 {
   int iVar1;
@@ -11984,10 +11984,10 @@ undefined4 FUN_10017610(int param_1)
 
 
 ======================================================================
-// Function: FUN_10017730 @ 10017730
+// Function: Waveform_CopyWithWrap @ 10017730
 ======================================================================
 
-undefined4 FUN_10017730(int param_1)
+undefined4 Waveform_CopyWithWrap(int param_1)
 
 {
   uint uVar1;
@@ -12049,10 +12049,10 @@ undefined4 FUN_10017730(int param_1)
 
 
 ======================================================================
-// Function: FUN_10017840 @ 10017840
+// Function: Waveform_MirrorCopy @ 10017840
 ======================================================================
 
-undefined4 FUN_10017840(int param_1)
+undefined4 Waveform_MirrorCopy(int param_1)
 
 {
   int iVar1;
@@ -12163,10 +12163,10 @@ undefined4 FUN_100179a0(int param_1)
 
 
 ======================================================================
-// Function: FUN_10017a10 @ 10017a10
+// Function: Preset_FillBuffer @ 10017a10
 ======================================================================
 
-ulonglong FUN_10017a10(int param_1)
+ulonglong Preset_FillBuffer(int param_1)
 
 {
   undefined4 uVar1;
@@ -12261,10 +12261,10 @@ ulonglong FUN_10017b10(int param_1)
 
 
 ======================================================================
-// Function: FUN_10017d40 @ 10017d40
+// Function: Audio_RandomSelect @ 10017d40
 ======================================================================
 
-undefined4 FUN_10017d40(int param_1)
+undefined4 Audio_RandomSelect(int param_1)
 
 {
   int iVar1;
@@ -12300,10 +12300,10 @@ undefined4 FUN_10017d40(int param_1)
 
 
 ======================================================================
-// Function: FUN_10017f40 @ 10017f40
+// Function: Waveform_CopyToDisplay @ 10017f40
 ======================================================================
 
-undefined4 FUN_10017f40(int *param_1)
+undefined4 Waveform_CopyToDisplay(int *param_1)
 
 {
   if (param_1[0x3271] == 0) {
