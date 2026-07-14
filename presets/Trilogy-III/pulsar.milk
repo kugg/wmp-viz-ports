@@ -51,16 +51,49 @@ fDecay=0.950000
 per_frame_1=warp = 0;
 per_frame_2=wave_a = 0;
 
+wavecode_0_enabled=1
+wavecode_0_bSpectrum=1
+wavecode_0_samples=512
+wavecode_0_scaling=10.000000
+wavecode_0_smoothing=0.500000
+wavecode_0_sep=0
+wavecode_0_bUseDots=0
+wavecode_0_bDrawThick=1
+wavecode_0_bAdditive=1
+wavecode_0_r=1.0
+wavecode_0_g=1.0
+wavecode_0_b=1.0
+wavecode_0_a=0.9
+
+wave_0_per_point1=x = sample;
+wave_0_per_point2=y = 0.5 - value1 * 0.4;
+wave_0_per_point3=g = 0.5 + 0.5 * sin(sample * 3.14159);
+wave_0_per_point4=b = 0.5 + 0.5 * sin(sample * 6.2832);
+wave_0_per_point5=r = g * 0.1;
+wave_0_per_point6=a = 0.9;
+
+wavecode_1_enabled=1
+wavecode_1_bSpectrum=1
+wavecode_1_samples=512
+wavecode_1_scaling=10.000000
+wavecode_1_smoothing=0.500000
+wavecode_1_sep=0
+wavecode_1_bUseDots=0
+wavecode_1_bDrawThick=1
+wavecode_1_bAdditive=1
+wavecode_1_r=1.0
+wavecode_1_g=1.0
+wavecode_1_b=1.0
+wavecode_1_a=0.7
+
+wave_1_per_point1=x = sample;
+wave_1_per_point2=y = 0.5 + value1 * 0.4;
+wave_1_per_point3=g = 0.5 + 0.5 * sin(sample * 3.14159);
+wave_1_per_point4=b = 0.5 + 0.5 * sin(sample * 6.2832);
+wave_1_per_point5=r = g * 0.1;
+wave_1_per_point6=a = 0.7;
+
 comp_1=`shader_body
 comp_2=`{
-comp_3=`  float freq = uv.x;
-comp_4=`  float t = time * 0.3;
-comp_5=`  float h1 = 0.5 + 0.5*sin(freq*6.28 + t*1.0);
-comp_6=`  float h2 = 0.5 + 0.5*sin(freq*12.0 - t*1.5);
-comp_7=`  float h3 = 0.5 + 0.5*sin(freq*3.0 + t*0.7);
-comp_8=`  float h4 = 0.5 + 0.5*sin(freq*20.0 + t*2.0);
-comp_9=`  float peak = h1 * h2 * h3 * h4;
-comp_10=`  float dist = abs(uv.y - 0.5);
-comp_11=`  float g = peak * max(0.0, 1.0 - dist * 3.0);
-comp_12=`  ret = float3(0, g, 0);
-comp_13=`}
+comp_3=`  ret = tex2D(sampler_main, uv).rgb;
+comp_4=`}

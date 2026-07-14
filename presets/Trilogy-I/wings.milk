@@ -50,27 +50,57 @@ fDecay=0.950000
 
 per_frame_1=warp = 0;
 per_frame_2=wave_a = 0;
+per_frame_3=t = time;
+
+wavecode_0_enabled=1
+wavecode_0_bSpectrum=1
+wavecode_0_samples=512
+wavecode_0_scaling=10.000000
+wavecode_0_smoothing=0.500000
+wavecode_0_sep=0
+wavecode_0_bUseDots=0
+wavecode_0_bDrawThick=1
+wavecode_0_bAdditive=1
+wavecode_0_r=1.0
+wavecode_0_g=1.0
+wavecode_0_b=1.0
+wavecode_0_a=0.9
+
+wave_0_per_point1=angle = sample * 3.14159;
+wave_0_per_point2=r = 0.05 + value1 * 0.25;
+wave_0_per_point3=wing = sin(angle) * sin(angle);
+wave_0_per_point4=x = 0.5 + cos(angle) * r * wing;
+wave_0_per_point5=y = 0.5 - sin(angle) * r * wing - 0.1;
+wave_0_per_point6=g = 0.5 + 0.5 * sin(sample * 6.2832);
+wave_0_per_point7=b = g * 0.8;
+wave_0_per_point8=r_col = 0.005;
+wave_0_per_point9=a = 0.9;
+
+wavecode_1_enabled=1
+wavecode_1_bSpectrum=1
+wavecode_1_samples=512
+wavecode_1_scaling=10.000000
+wavecode_1_smoothing=0.500000
+wavecode_1_sep=0
+wavecode_1_bUseDots=0
+wavecode_1_bDrawThick=1
+wavecode_1_bAdditive=1
+wavecode_1_r=1.0
+wavecode_1_g=1.0
+wavecode_1_b=1.0
+wavecode_1_a=0.7
+
+wave_1_per_point1=angle = sample * 3.14159;
+wave_1_per_point2=r = 0.05 + value1 * 0.25;
+wave_1_per_point3=wing = sin(angle) * sin(angle);
+wave_1_per_point4=x = 0.5 - cos(angle) * r * wing;
+wave_1_per_point5=y = 0.5 - sin(angle) * r * wing - 0.1;
+wave_1_per_point6=g = 0.5 + 0.5 * sin(sample * 6.2832);
+wave_1_per_point7=b = g * 0.8;
+wave_1_per_point8=r_col = 0.005;
+wave_1_per_point9=a = 0.7;
 
 comp_1=`shader_body
 comp_2=`{
-comp_3=`  float2 uv_c = uv - 0.5;
-comp_4=`  float r = length(uv_c);
-comp_5=`  float angle = atan2(uv_c.y, uv_c.x);
-comp_6=`  float t = time * 0.4;
-comp_7=`
-comp_8=`  float wing_up = max(0.0, 0.3 - uv_c.y);
-comp_9=`  float wing_shape = sin(angle * 2.0) * sin(angle * 2.0);
-comp_10=`  float feather = 0.5 + 0.5 * sin(angle * 8.0 + r * 6.0);
-comp_11=`  float wing = wing_shape * feather * wing_up;
-comp_12=`  float brightness = max(0.0, 1.0 - r * 1.2);
-comp_13=`  wing = wing * brightness * 5.0 + 0.2;
-comp_14=`
-comp_15=`  float pulse = 0.85 + 0.15 * sin(t * 1.5);
-comp_16=`  wing = wing * pulse;
-comp_17=`
-comp_18=`  float r_col = wing * 0.005;
-comp_19=`  float g_col = wing * 0.9;
-comp_20=`  float b_col = wing * 0.7;
-comp_21=`
-comp_22=`  ret = float3(r_col, g_col, b_col);
-comp_23=`}
+comp_3=`  ret = tex2D(sampler_main, uv).rgb;
+comp_4=`}
