@@ -51,6 +51,7 @@ fDecay=0.950000
 per_frame_1=warp = 0;
 per_frame_2=wave_a = 0;
 
+// Bottom half - spectrum bars going down
 wavecode_0_enabled=1
 wavecode_0_bSpectrum=1
 wavecode_0_samples=512
@@ -67,11 +68,13 @@ wavecode_0_a=0.9
 
 wave_0_per_point1=x = sample;
 wave_0_per_point2=y = 0.5 - value1 * 0.4;
-wave_0_per_point3=g = 0.5 + 0.5 * sin(sample * 3.14159);
-wave_0_per_point4=b = 0.5 + 0.5 * sin(sample * 6.2832);
-wave_0_per_point5=r = g * 0.1;
-wave_0_per_point6=a = 0.9;
+wave_0_per_point3=hue = y * 6.2832;
+wave_0_per_point4=r = 0.5 + 0.5*sin(hue);
+wave_0_per_point5=g = 0.5 + 0.5*sin(hue + 2.094);
+wave_0_per_point6=b = 0.5 + 0.5*sin(hue + 4.189);
+wave_0_per_point7=a = 0.9;
 
+// Top half - spectrum bars going up (mirrored)
 wavecode_1_enabled=1
 wavecode_1_bSpectrum=1
 wavecode_1_samples=512
@@ -88,12 +91,20 @@ wavecode_1_a=0.7
 
 wave_1_per_point1=x = sample;
 wave_1_per_point2=y = 0.5 + value1 * 0.4;
-wave_1_per_point3=g = 0.5 + 0.5 * sin(sample * 3.14159);
-wave_1_per_point4=b = 0.5 + 0.5 * sin(sample * 6.2832);
-wave_1_per_point5=r = g * 0.1;
-wave_1_per_point6=a = 0.7;
+wave_1_per_point3=hue = y * 6.2832;
+wave_1_per_point4=r = 0.5 + 0.5*sin(hue);
+wave_1_per_point5=g = 0.5 + 0.5*sin(hue + 2.094);
+wave_1_per_point6=b = 0.5 + 0.5*sin(hue + 4.189);
+wave_1_per_point7=a = 0.7;
 
 comp_1=`shader_body
 comp_2=`{
-comp_3=`  ret = tex2D(sampler_main, uv).rgb;
-comp_4=`}
+comp_3=`  float3 col = tex2D(sampler_main, uv).rgb;
+comp_4=`  float spread = 0.01 + 0.02*max(bass_att - 0.3, 0.0);
+comp_5=`  for (int i = -6; i <= 6; i++) {
+comp_6=`    float fi = float(i) * spread;
+comp_7=`    col += tex2D(sampler_main, uv + float2(0, fi)).rgb;
+comp_8=`  }
+comp_9=`  col /= 13.0;
+comp_10=`  ret = col;
+comp_11=`}
