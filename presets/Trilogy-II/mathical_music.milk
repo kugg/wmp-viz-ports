@@ -4,8 +4,28 @@ PSVERSION_WARP=2
 PSVERSION_COMP=2
 [preset00]
 // Trilogy II - Mathical Music
-// Ported from WMP TrilogyII.dll
-// Beat-reactive expanding concentric rings with angular modulation
+// Ported from WMP TrilogyII.dll decompiled rendering pipeline
+//
+// KEY INSIGHT: WMP is a FEEDBACK system, not a pattern generator.
+// Effect_GenerateTexture (10002F60) ping-pongs two buffers.
+// Transform_PolarCoords (10009670) reads each pixel and MODIFIES it
+// based on position. The ring pattern emerges from the feedback loop,
+// not from explicit ring equations.
+//
+// Transform_PolarCoords algorithm per pixel:
+// 1. Skip transparent pixels (pass-through)
+// 2. Compute polar coords: row/col relative to center
+// 3. Apply stretch: dx *= (1 + stretch_x), dy *= (1 + stretch_y)
+// 4. Direction filter: ring (ratio check) or wedge (frac check)
+// 5. Radial gate: skip if dist outside radius_threshold
+// 6. Angular position: angle = dist² * ang_scale / div + ang_offset + acc
+// 7. Lookup sin/cos LUT: intensity = (color_scale + sin_lut[angle]) * radial
+// 8. LERP source RGB toward target RGB based on intensity
+// 9. Alpha modulation, clamp, write
+//
+// For MilkDrop: fDecay provides the feedback loop.
+// Warp shader applies position-dependent modulation per frame.
+// Rings BUILD UP over time through feedback.
 fRating=3.000000
 fGammaAdj=1.000000
 fVideoEchoZoom=1.000000
@@ -56,43 +76,64 @@ wave_scale=1.000000
 wave_smoothing=0.500000
 wave_mystery=0.000000
 wave_aspect=1.000000
-fDecay=0.950000
+fDecay=0.960000
 
+// Per-frame: beat-reactive parameters
+// Maps to Motion_ComplexPhysics (10005F50) + audio spectrum analysis
 per_frame_1=t = time*0.5;
-per_frame_2=beat = max(bass - 0.5, 0.0)*2.0;
-per_frame_3=q1 = 0.1 + 0.4*beat;
-per_frame_4=zoom = 1.0 - 0.04*beat;
-per_frame_5=dx = 0.003*sin(t*1.5)*beat;
-per_frame_6=dy = 0.003*cos(t*1.1)*beat;
+per_frame_2=bval = bass - 0.5;
+per_frame_3=beat = max(bval*2.0, 0.0);
+// Hue rotation via sin/cos LUT (offset 0xBC28, 360 entries)
+per_frame_4=hue = t*45.0;
+// Target RGB from per-preset data (0x3198/319C/31A0)
+per_frame_5=q1 = 0.8 + 0.2*sin(hue*0.0349);
+per_frame_6=q2 = 0.4 + 0.3*sin((hue+120.0)*0.0349);
+per_frame_7=q3 = 0.2 + 0.4*sin((hue+240.0)*0.0349);
+// Angular speed from float_param[0x3c] * _DAT_10021310
+per_frame_8=q4 = 0.1 + 0.4*beat;
 
+// Warp shader: position-dependent modulation
+// Maps to Transform_PolarCoords per-pixel loop
+// This is where the ring pattern BUILDS UP through feedback
+per_pixel_1=ux = (x-0.5)*2.0;
+per_pixel_2=uy = (y-0.5)*2.0;
+per_pixel_3=dist = sqrt(ux*ux + uy*uy);
+per_pixel_4=ang = atan2(uy, ux);
+// Stretch factors: float_param[0x33] (x), float_param[0x32] (y)
+per_pixel_5=sx2 = 1.0 + 0.3*sin(time*0.2);
+per_pixel_6=sy2 = 1.0 + 0.3*cos(time*0.3);
+// Apply stretch: maps to pixel_dx/pixel_dy computation
+per_pixel_7=edx = ux*sx2;
+per_pixel_8=edy = uy*sy2;
+per_pixel_9=edist = sqrt(edx*edx + edy*edy);
+// Radial gate: float_param[0x30]² * 2 = radius_threshold
+per_pixel_10=radius_limit = 0.6 + 0.1*sin(time*0.4);
+per_pixel_11=inside = step(edist, radius_limit);
+// Direction filter: float_param[0x39]
+// Ring filter: ratio = min(|dx|,|dy|) / max(|dx|,|dy|)
+per_pixel_12=absx = abs(edx);
+per_pixel_13=absy = abs(edy);
+per_pixel_14=maxv = max(absx, absy);
+per_pixel_15=minv = min(absx, absy);
+per_pixel_16=ratio = minv / max(maxv, 0.001);
+per_pixel_17=dir_pass = step(0.3, ratio);
+// Angular position: dist² * ang_scale / div + ang_offset + acc
+// acc accumulates: ang_acc += float_param[0x3c] * _DAT_10021310
+per_pixel_18=angle_idx = edist*edist*8.0 + ang*2.0 + time*3.0;
+per_pixel_19=sin_val = sin(angle_idx);
+// Intensity: (color_scale + sin_lut[angle]) * radial_scale
+// color_scale = float_param[0x35]
+per_pixel_20=intensity = (0.3 + sin_val*0.7) * (1.0 - edist/radius_limit);
+// Final mask: combine all gates
+per_pixel_21=mask = inside * dir_pass * max(intensity, 0.0);
+// Warp direction: subtle radial expansion
+per_pixel_22=warp_strength = 0.002 * mask;
+per_pixel_23=wdx = ux * warp_strength;
+per_pixel_24=wdy = uy * warp_strength;
+
+// Composite shader: read feedback texture and apply modulation
+// Maps to the blend stage after Transform_PolarCoords
 comp_1=`shader_body
 comp_2=`{
-comp_3=`  float2 uv2 = uv - 0.5;
-comp_4=`  float dist = length(uv2);
-comp_5=`  float angle = atan2(uv2.y, uv2.x);
-comp_6=`
-comp_7=`  float expand = q1;
-comp_8=`  float rings = 0.0;
-comp_9=`  for (int i = 0; i < 5; i++) {
-comp_10=`    float fi = float(i);
-comp_11=`    float r = fmod(dist*(3.0+fi*1.5) - time*expand*2.0 - fi*0.2, 1.0);
-comp_12=`    rings += smoothstep(0.42, 0.5, r) - smoothstep(0.5, 0.58, r);
-comp_13=`  }
-comp_14=`  rings *= 0.2;
-comp_15=`
-comp_16=`  float musical = 0.5 + 0.5*sin(angle*4.0 + time*2.0);
-comp_17=`  musical *= 0.5 + 0.5*sin(angle*7.0 - time*1.3);
-comp_18=`  rings *= musical;
-comp_19=`
-comp_20=`  float falloff = 1.0 - saturate(dist*1.6);
-comp_21=`  rings *= falloff;
-comp_22=`
-comp_23=`  float beat2 = max(bass_att - 0.5, 0.0)*2.0;
-comp_24=`  float3 hot = float3(1.0, 0.8, 0.2);
-comp_25=`  float3 cool = float3(0.2, 0.4, 0.9);
-comp_26=`  float3 col = lerp(cool, hot, beat2);
-comp_27=`  col *= rings;
-comp_28=`  col += pow(rings, 2.0) * float3(1.0, 0.6, 0.1) * 1.5;
-comp_29=`
-comp_30=`  ret = col;
-comp_31=`}
+comp_3=`  ret = tex2D(sampler, uv);
+comp_4=`}
